@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   Compass,
+  Coffee,
   Edit3,
   Heart,
   Home,
@@ -35,6 +36,7 @@ import {
   XCircle,
   ZoomIn
 } from "lucide-react";
+import categoryGroups from "./data/categories.json";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 const ADMIN_CODE_STORAGE = "soomgilAdminCode";
@@ -42,14 +44,21 @@ const USER_STORAGE = "soomgilUser";
 const SAVED_ID_STORAGE = "soomgilSavedIdentifier";
 const AUTO_LOGIN_STORAGE = "soomgilAutoLogin";
 
-const categories = [
-  { id: "tour", label: "관광지", icon: MapPin, items: ["전망대", "야경", "바다", "계곡"] },
-  { id: "walk", label: "산책길", icon: Compass, items: ["둘레길", "숲길", "오름", "강변"] },
-  { id: "camping", label: "캠핑", icon: Bookmark, items: ["야영장", "글램핑", "차박", "계곡캠핑"] },
-  { id: "food", label: "맛집", icon: Star, items: ["로컬맛집", "카페", "시장", "디저트"] },
-  { id: "culture", label: "문화", icon: CalendarDays, items: ["전시", "역사", "마을", "박물관"] },
-  { id: "pet", label: "동반", icon: Heart, items: ["반려동물", "무장애", "아이와", "가족"] }
-];
+const categoryIcons = {
+  map: MapPin,
+  compass: Compass,
+  bookmark: Bookmark,
+  star: Star,
+  calendar: CalendarDays,
+  heart: Heart,
+  camera: Camera,
+  coffee: Coffee
+};
+
+const categories = categoryGroups.map((item) => ({
+  ...item,
+  icon: categoryIcons[item.icon] || MapPin
+}));
 
 const badges = [
   { id: "first-search", label: "첫 검색", grade: "Basic", color: "#6d5dfc" },
@@ -84,9 +93,9 @@ const seasonBanners = [
 ];
 
 const navItems = [
-  { page: "home", path: "/", label: "홈", icon: Home },
   { page: "category", path: "/category", label: "카테고리", icon: Compass },
   { page: "map", path: "/map", label: "지도", icon: MapIcon },
+  { page: "home", path: "/", label: "홈", icon: Home },
   { page: "diary", path: "/diary", label: "다이어리", icon: CalendarDays },
   { page: "mypage", path: "/mypage", label: "마이", icon: User }
 ];
@@ -395,9 +404,12 @@ export default function App() {
     navigate("home", "/");
   }
 
-  const layoutClass = page === "diary" || page === "admin" || page === "login" || page === "signup"
-    ? "app no-bottom-nav"
-    : "app";
+  const layoutClass = [
+    "app",
+    page === "admin" ? "admin-app" : "",
+    page === "diary" ? "diary-app" : "",
+    page === "diary" || page === "admin" || page === "login" || page === "signup" ? "no-bottom-nav" : ""
+  ].filter(Boolean).join(" ");
 
   return (
     <div className={layoutClass}>
@@ -437,8 +449,8 @@ export default function App() {
     return (
       <header className="app-header">
         <button className="brand" onClick={() => navigate("home", "/")}>
-          <span className="brand-mark">숨</span>
-          <span>숨길</span>
+          <span className="brand-mark">S</span>
+          <span>Soomgil</span>
         </button>
         <div className="header-actions">
           <button className="icon-button" onClick={() => setDarkMode((value) => !value)} aria-label="다크모드">
@@ -529,9 +541,10 @@ export default function App() {
             {categories.slice(0, 6).map((item) => {
               const Icon = item.icon;
               return (
-                <button key={item.id} className="quick-card" onClick={() => applyFilter({ category: item.id })}>
+                <button key={item.id} className="quick-card" onClick={() => applyFilter({ category: item.query || item.id })}>
                   <Icon size={22} />
                   <strong>{item.label}</strong>
+                  <span>{item.items.slice(0, 2).join(" · ")}</span>
                 </button>
               );
             })}
@@ -604,7 +617,10 @@ export default function App() {
           <h3>{place.name}</h3>
           <p className="address"><MapPin size={15} /> {place.address}</p>
           <div className="meta-row">
-            <span className="pill yellow">숨길 별점 {Number(place.hiddenRating || 0).toFixed(1)} {stars(place.hiddenRating)}</span>
+            <span className="pill yellow rating-pill">
+              <span>숨길 별점 {Number(place.hiddenRating || 0).toFixed(1)}</span>
+              <span className="rating-stars">{stars(place.hiddenRating)}</span>
+            </span>
             <span className="pill red">{place.crowd}</span>
           </div>
           <div className="sub-info">
@@ -706,8 +722,11 @@ export default function App() {
   }
 
   function renderCategory() {
-    const [selectedGroup, setSelectedGroup] = [category || "tour", (value) => applyFilter({ category: value })];
-    const group = categories.find((item) => item.id === selectedGroup) || categories[0];
+    const selectedGroup = categories.find((item) => {
+      return category === item.id || category === item.query || item.items.includes(category);
+    }) || categories[0];
+    const group = selectedGroup;
+    const setSelectedGroup = (item) => applyFilter({ category: item.query || item.id });
     return (
       <div className="page">
         <PageTitle title="카테고리 탐색" subtitle="대주제를 먼저 고르고 세부 키워드를 선택합니다." />
@@ -715,15 +734,19 @@ export default function App() {
           {categories.map((item) => {
             const Icon = item.icon;
             return (
-              <button key={item.id} className={selectedGroup === item.id ? "category-card active" : "category-card"} onClick={() => setSelectedGroup(item.id)}>
+              <button key={item.id} className={group.id === item.id ? "category-card active" : "category-card"} onClick={() => setSelectedGroup(item)}>
                 <Icon size={26} />
-                <strong>{item.label}</strong>
+                <div>
+                  <strong>{item.label}</strong>
+                  <p>{item.items.slice(0, 3).join(" · ")}</p>
+                </div>
               </button>
             );
           })}
         </div>
         <section className="section card-section">
           <h2>{group.label} 세부 키워드</h2>
+          <p className="category-description">{group.description}</p>
           <div className="chip-row">
             {group.items.map((item) => (
               <button key={item} className="chip" onClick={() => submitSearch(item)}>#{item}</button>
@@ -736,7 +759,12 @@ export default function App() {
   }
 
   function renderMap() {
-    const visiblePlaces = category ? places.filter((item) => String(item.category).includes(category)) : places;
+    const visiblePlaces = category
+      ? places.filter((item) => {
+          const text = `${item.category || ""} ${item.categoryLabel || ""} ${item.tags || ""}`;
+          return text.includes(category) || text.includes((categories.find((group) => group.query === category)?.label) || "");
+        })
+      : places;
     return (
       <div className="page">
         <PageTitle title="지도 탐색" subtitle="범례를 누르면 관련 장소 근처로 이동한 것처럼 결과를 좁혀 보여줍니다." />
@@ -744,7 +772,7 @@ export default function App() {
           {categories.map((item) => {
             const Icon = item.icon;
             return (
-              <button key={item.id} className={category === item.id ? "chip active" : "chip"} onClick={() => applyFilter({ category: category === item.id ? "" : item.id })}>
+              <button key={item.id} className={category === item.id || category === item.query ? "chip active" : "chip"} onClick={() => applyFilter({ category: category === item.query ? "" : item.query || item.id })}>
                 <Icon size={15} /> {item.label}
               </button>
             );
@@ -1331,8 +1359,13 @@ export default function App() {
       <nav className="bottom-nav">
         {navItems.map((item) => {
           const Icon = item.icon;
+          const className = [
+            "nav-button",
+            item.page === "home" ? "home-nav" : "",
+            page === item.page ? "active" : ""
+          ].filter(Boolean).join(" ");
           return (
-            <button key={item.page} className={page === item.page ? "active" : ""} onClick={() => navigate(item.page, item.path)}>
+            <button key={item.page} className={className} onClick={() => navigate(item.page, item.path)}>
               <Icon size={20} />
               <span>{item.label}</span>
             </button>
@@ -1874,7 +1907,7 @@ function AuthShell({ title, subtitle, children }) {
         <ChevronLeft size={20} /> 돌아가기
       </button>
       <section className="auth-card">
-        <div className="brand center"><span className="brand-mark">숨</span><span>숨길</span></div>
+        <div className="brand center"><span className="brand-mark">S</span><span>Soomgil</span></div>
         <h1>{title}</h1>
         <p>{subtitle}</p>
         {children}

@@ -5,7 +5,7 @@ node_modules/
 dist/
 build/
 .gradle/
-data/
+backend/data/
 *.log
 *.tmp
 *.class

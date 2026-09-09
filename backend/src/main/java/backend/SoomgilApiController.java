@@ -850,6 +850,13 @@ public class SoomgilApiController {
                     """, "test01@soomgil.local", true, "테스트사용자", LocalDateTime.now(), hashPassword("Test01!23"), "01000000001", true, true, "test01", "local", "test01");
             upsertUserSetting("test01", "테스트사용자", "test01@soomgil.local", "01000000001");
         }
+        if (count("SELECT COUNT(*) FROM user_accounts WHERE username=?", "test1") == 0) {
+            jdbc.update("""
+                    INSERT INTO user_accounts(email,email_verified,full_name,joined_at,password_hash,phone,phone_verified,privacy_consent,username,auth_provider,provider_id)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?)
+                    """, "test1@soomgil.local", true, "테스트1", LocalDateTime.now(), hashPassword("Test1!234"), "01000000011", true, true, "test1", "local", "test1");
+            upsertUserSetting("test1", "테스트1", "test1@soomgil.local", "01000000011");
+        }
         if (count("SELECT COUNT(*) FROM user_accounts WHERE username=?", "demo") == 0) {
             jdbc.update("""
                     INSERT INTO user_accounts(email,email_verified,full_name,joined_at,password_hash,phone,phone_verified,privacy_consent,username,auth_provider,provider_id)
