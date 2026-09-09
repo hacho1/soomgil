@@ -1,0 +1,15 @@
+.env
+.env.local
+.env.production
+node_modules/
+dist/
+build/
+.gradle/
+data/
+*.log
+*.tmp
+*.class
+*.jar
+!backend/gradle/wrapper/gradle-wrapper.jar
+backup/*.sql
+!backup/README.md
