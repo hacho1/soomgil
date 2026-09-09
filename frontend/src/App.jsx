@@ -753,7 +753,6 @@ export default function App() {
             ))}
           </div>
         </section>
-        {renderSearchResults()}
       </div>
     );
   }
