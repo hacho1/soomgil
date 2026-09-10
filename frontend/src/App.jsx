@@ -1882,9 +1882,10 @@ function AdminInquiry({ item, adminCode, reload }) {
   );
 }
 
-function PageTitle({ title, subtitle }) {
+function PageTitle({ title, subtitle, eyebrow = "SOOMGIL" }) {
   return (
     <div className="page-title">
+      <span>{eyebrow}</span>
       <h1>{title}</h1>
       {subtitle && <p>{subtitle}</p>}
     </div>
