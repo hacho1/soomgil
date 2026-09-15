@@ -1,0 +1,17 @@
+{
+  "repository": "https://github.com/microsoft/fluentui-emoji",
+  "revision": "1ffb34c752ecf5d402f04cfb4b392c77f57c54bc",
+  "license": "MIT",
+  "assets": {
+    "all": { "file": "all.png", "source": "assets/World map/3D/world_map_3d.png", "tone": "sky", "label": "전체" },
+    "tour": { "file": "tour.png", "source": "assets/Beach with umbrella/3D/beach_with_umbrella_3d.png", "tone": "sky", "label": "관광지" },
+    "cafe": { "file": "cafe.png", "source": "assets/Hot beverage/3D/hot_beverage_3d.png", "tone": "peach", "label": "카페" },
+    "food": { "file": "food.png", "source": "assets/Fork and knife with plate/3D/fork_and_knife_with_plate_3d.png", "tone": "rose", "label": "맛집" },
+    "walk": { "file": "walk.png", "source": "assets/Evergreen tree/3D/evergreen_tree_3d.png", "tone": "mint", "label": "산책길" },
+    "camping": { "file": "camping.png", "source": "assets/Camping/3D/camping_3d.png", "tone": "gold", "label": "캠핑" },
+    "nature": { "file": "nature.png", "source": "assets/National park/3D/national_park_3d.png", "tone": "mint", "label": "자연" },
+    "culture": { "file": "culture.png", "source": "assets/Classical building/3D/classical_building_3d.png", "tone": "lilac", "label": "문화" },
+    "experience": { "file": "experience.png", "source": "assets/Ferris wheel/3D/ferris_wheel_3d.png", "tone": "gold", "label": "체험" },
+    "photo": { "file": "photo.png", "source": "assets/Camera/3D/camera_3d.png", "tone": "lilac", "label": "사진" }
+  }
+}

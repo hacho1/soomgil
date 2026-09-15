@@ -1,0 +1,14 @@
+[
+  {"id":"sea","queries":["바다","해변","해수욕장"],"titleTerms":[],"titleSuffixes":["해변","해수욕장","해안","해안길","해안산책로","해안둘레길","해안탐방로","바닷가","모래사장","몽돌"],"categories":[],"excludedCategories":["cafe","food","camping","stay"],"excludedTitleTerms":["펜션","호텔","리조트","민박","카페","커피","식당","맛집","캠핑","야영","글램핑","드라이브 코스"]},
+  {"id":"walk","queries":["산책","산책길","산책로","둘레길","트레킹","트래킹","숲길"],"titleTerms":["산책","둘레길","숲길","탐방로","올레길","갈맷길","수목원","공원"],"categories":[],"excludedCategories":["cafe","food","camping","stay"],"excludedTitleTerms":["펜션","호텔","리조트","민박","카페","캠핑","드라이브 코스"]},
+  {"id":"camping","queries":["캠핑","캠핑장","야영장","글램핑","카라반"],"titleTerms":["캠핑","야영","글램핑","카라반"],"categories":["camping"],"excludedCategories":["cafe","food"],"excludedTitleTerms":[]},
+  {"id":"cafe","queries":["카페","커피숍","커피","찻집"],"titleTerms":["카페","커피","찻집","다방","로스터리"],"categories":["cafe"],"excludedCategories":[],"excludedTitleTerms":[]},
+  {"id":"food","queries":["맛집","음식점","식당"],"titleTerms":["식당","국수","국밥","횟집"],"categories":["food"],"excludedCategories":["cafe","camping"],"excludedTitleTerms":[]},
+  {"id":"valley","queries":["계곡"],"titleTerms":["계곡","폭포"],"categories":[],"excludedCategories":["cafe","food","camping","stay"],"excludedTitleTerms":["펜션","호텔","리조트","민박","산장"]},
+  {"id":"nature","queries":["자연","숲","수목원","휴양림","자연휴양림"],"titleTerms":["수목원","휴양림","숲","습지","생태공원","식물원"],"categories":["nature"],"excludedCategories":["cafe","food","camping","stay"],"excludedTitleTerms":["펜션","호텔","리조트","민박"]},
+  {"id":"mountain","queries":["산","등산","오름"],"titleTerms":["오름","등산","탐방로","국립공원","도립공원"],"categories":["mountain"],"excludedCategories":["cafe","food","camping","stay"],"excludedTitleTerms":["펜션","호텔","리조트","민박"]},
+  {"id":"museum","queries":["박물관","기념관"],"titleTerms":["박물관","기념관","과학관"],"categories":["museum"],"excludedCategories":["cafe","food","camping"],"excludedTitleTerms":[]},
+  {"id":"culture","queries":["전시","전시관","전시장","미술관"],"titleTerms":["전시","미술관","갤러리","박물관"],"categories":[],"excludedCategories":["cafe","food","camping"],"excludedTitleTerms":[]},
+  {"id":"history","queries":["역사","유적","유적지","문화재"],"titleTerms":["유적","고궁","궁궐","고택","성곽","산성","서원","향교","사찰","한옥마을"],"categories":["history"],"excludedCategories":["cafe","food","camping"],"excludedTitleTerms":["펜션","호텔"]},
+  {"id":"park","queries":["공원","정원"],"titleTerms":["공원","정원"],"categories":["park"],"excludedCategories":["cafe","food","camping","stay"],"excludedTitleTerms":["펜션","호텔","리조트","민박"]}
+]

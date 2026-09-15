@@ -1,0 +1,170 @@
+[
+  {
+    "name": "순포해변",
+    "address": "강원특별자치도 강릉시 사천면 해안로 722",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/02/2921902_image2_1.jpg",
+    "mapx": "128.8902985428",
+    "mapy": "37.8193190673",
+    "category": "tour"
+  },
+  {
+    "name": "가새기오름",
+    "address": "제주특별자치도 제주시 오라삼동",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/82/3477882_image2_1.jpg",
+    "mapx": "126.5038611983",
+    "mapy": "33.4893700755",
+    "category": "tour"
+  },
+  {
+    "name": "곰앤패들보드 캠핑장",
+    "address": "강원특별자치도 강릉시 해안로 656-1",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/60/2920460_image2_1.jpg",
+    "mapx": "128.8953593321",
+    "mapy": "37.8149974438",
+    "category": "camping"
+  },
+  {
+    "name": "경포한미횟집",
+    "address": "강원특별자치도 강릉시 창해로 491",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/63/2709763_image2_1.jpg",
+    "mapx": "128.9088001327",
+    "mapy": "37.8038545513",
+    "category": "food"
+  },
+  {
+    "name": "뒷뜨루관광농원",
+    "address": "강원특별자치도 강릉시 사천면 청솔공원길 108",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/84/3560184_image2_1.jpg",
+    "mapx": "128.8370445153",
+    "mapy": "37.8353717256",
+    "category": "tour"
+  },
+  {
+    "name": "강릉경포카라반파크",
+    "address": "강원특별자치도 강릉시 사천면 해안로 904-14",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/43/2727143_image2_1.jpg",
+    "mapx": "128.8760188700",
+    "mapy": "37.8323756100",
+    "category": "camping"
+  },
+  {
+    "name": "대기리야영장",
+    "address": "강원특별자치도 강릉시 왕산면 왕산로 1327",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/62/2797062_image2_1.jpg",
+    "mapx": "128.7776435739",
+    "mapy": "37.5883185884",
+    "category": "camping"
+  },
+  {
+    "name": "삼산 야영장",
+    "address": "강원특별자치도 강릉시 연곡면 진고개로 1296",
+    "image": "",
+    "mapx": "128.6813221297",
+    "mapy": "37.8461174558",
+    "category": "camping"
+  },
+  {
+    "name": "칠공주불고기",
+    "address": "강원특별자치도 강릉시 참샘길 12",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/49/2874049_image2_1.jpg",
+    "mapx": "128.8088251462",
+    "mapy": "37.9150508320",
+    "category": "food"
+  },
+  {
+    "name": "강릉불고기 초당점",
+    "address": "강원특별자치도 강릉시 초당순두부길 2",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/37/2845537_image2_1.JPG",
+    "mapx": "128.9088228368",
+    "mapy": "37.7882619117",
+    "category": "food"
+  },
+  {
+    "name": "이디야커피강릉사천점",
+    "address": "강원특별자치도 강릉시 사천면 진리해변길 68-14",
+    "image": "",
+    "mapx": "128.8760909157",
+    "mapy": "37.8378749747",
+    "category": "cafe"
+  },
+  {
+    "name": "호린파크(경포대허브농장)",
+    "address": "강원특별자치도 강릉시 사천면 해안로 1119-51",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/41/3464341_image2_1.jpg",
+    "mapx": "128.8656527627",
+    "mapy": "37.8444934488",
+    "category": "tour"
+  },
+  {
+    "name": "곳",
+    "address": "강원특별자치도 강릉시 진리해변길 143",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/68/2837768_image2_1.JPG",
+    "mapx": "128.8726549418",
+    "mapy": "37.8434325973",
+    "category": "cafe"
+  },
+  {
+    "name": "소돌해수욕장",
+    "address": "강원특별자치도 강릉시 주문진읍 해안로 1993",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/23/2921823_image2_1.jpg",
+    "mapx": "128.8272654209",
+    "mapy": "37.9062383246",
+    "category": "tour"
+  },
+  {
+    "name": "순포습지",
+    "address": "강원특별자치도 강릉시 사천면 산대월리",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/40/3562140_image2_1.jpg",
+    "mapx": "128.8875265360",
+    "mapy": "37.8204549924",
+    "category": "tour"
+  },
+  {
+    "name": "사근진해중공원 전망대",
+    "address": "강원특별자치도 강릉시 해안로604번길 16",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/39/2921939_image2_1.jpg",
+    "mapx": "128.8988285332",
+    "mapy": "37.8127616594",
+    "category": "tour"
+  },
+  {
+    "name": "오대산 소금강계곡",
+    "address": "강원특별자치도 강릉시 연곡면 삼산리",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/13/3577813_image2_1.jpg",
+    "mapx": "128.6576247467",
+    "mapy": "37.8306548995",
+    "category": "tour"
+  },
+  {
+    "name": "카페소돌엔",
+    "address": "강원특별자치도 강릉시 주문진읍 해안로 1987",
+    "image": "",
+    "mapx": "128.8279348033",
+    "mapy": "37.9063244389",
+    "category": "cafe"
+  },
+  {
+    "name": "백운계곡 (한탄강 유네스코 세계지질공원)",
+    "address": "경기도 포천시 이동면 도평리",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/97/3539797_image2_1.jpg",
+    "mapx": "127.4162",
+    "mapy": "38.0678",
+    "category": "tour"
+  },
+  {
+    "name": "묵호등대",
+    "address": "강원특별자치도 동해시 해맞이길 289 (묵호진동)",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/84/2741884_image2_1.jpg",
+    "mapx": "129.1184741143",
+    "mapy": "37.5548307473",
+    "category": "tour"
+  },
+  {
+    "name": "을왕리해수욕장",
+    "address": "인천광역시 중구 용유서로302번길 16-15 (을왕동)",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/78/3518478_image2_1.jpg",
+    "mapx": "126.372722",
+    "mapy": "37.445948",
+    "category": "tour"
+  }
+]

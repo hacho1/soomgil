@@ -1,0 +1,127 @@
+{
+  "repository": "https://github.com/microsoft/fluentui-emoji",
+  "revision": "1ffb34c752ecf5d402f04cfb4b392c77f57c54bc",
+  "license": "MIT",
+  "assets": {
+    "first-search": {
+      "file": "first-search.png",
+      "source": "assets/Magnifying glass tilted left/3D/magnifying_glass_tilted_left_3d.png",
+      "tone": "mint"
+    },
+    "search-ten": {
+      "file": "search-ten.png",
+      "source": "assets/Telescope/3D/telescope_3d.png",
+      "tone": "sky"
+    },
+    "search-thirty": {
+      "file": "search-thirty.png",
+      "source": "assets/Compass/3D/compass_3d.png",
+      "tone": "peach"
+    },
+    "search-hundred": {
+      "file": "search-hundred.png",
+      "source": "assets/Rocket/3D/rocket_3d.png",
+      "tone": "lilac"
+    },
+    "first-view": {
+      "file": "first-view.png",
+      "source": "assets/Seedling/3D/seedling_3d.png",
+      "tone": "mint"
+    },
+    "hidden-hunter": {
+      "file": "hidden-hunter.png",
+      "source": "assets/Camping/3D/camping_3d.png",
+      "tone": "peach"
+    },
+    "view-fifteen": {
+      "file": "view-fifteen.png",
+      "source": "assets/Sunrise over mountains/3D/sunrise_over_mountains_3d.png",
+      "tone": "gold"
+    },
+    "view-thirty": {
+      "file": "view-thirty.png",
+      "source": "assets/World map/3D/world_map_3d.png",
+      "tone": "sky"
+    },
+    "view-sixty": {
+      "file": "view-sixty.png",
+      "source": "assets/Snow-capped mountain/3D/snow-capped_mountain_3d.png",
+      "tone": "lilac"
+    },
+    "first-favorite": {
+      "file": "first-favorite.png",
+      "source": "assets/Sparkling heart/3D/sparkling_heart_3d.png",
+      "tone": "rose"
+    },
+    "collector": {
+      "file": "collector.png",
+      "source": "assets/Backpack/3D/backpack_3d.png",
+      "tone": "gold"
+    },
+    "favorite-fifteen": {
+      "file": "favorite-fifteen.png",
+      "source": "assets/Luggage/3D/luggage_3d.png",
+      "tone": "sky"
+    },
+    "favorite-thirty": {
+      "file": "favorite-thirty.png",
+      "source": "assets/Heart with ribbon/3D/heart_with_ribbon_3d.png",
+      "tone": "rose"
+    },
+    "reviewer": {
+      "file": "reviewer.png",
+      "source": "assets/Speech balloon/3D/speech_balloon_3d.png",
+      "tone": "sky"
+    },
+    "review-five": {
+      "file": "review-five.png",
+      "source": "assets/Love letter/3D/love_letter_3d.png",
+      "tone": "rose"
+    },
+    "review-fifteen": {
+      "file": "review-fifteen.png",
+      "source": "assets/Memo/3D/memo_3d.png",
+      "tone": "peach"
+    },
+    "review-thirty": {
+      "file": "review-thirty.png",
+      "source": "assets/Fountain pen/3D/fountain_pen_3d.png",
+      "tone": "lilac"
+    },
+    "traveler": {
+      "file": "traveler.png",
+      "source": "assets/Notebook/3D/notebook_3d.png",
+      "tone": "mint"
+    },
+    "diary-five": {
+      "file": "diary-five.png",
+      "source": "assets/Notebook with decorative cover/3D/notebook_with_decorative_cover_3d.png",
+      "tone": "rose"
+    },
+    "diary-fifteen": {
+      "file": "diary-fifteen.png",
+      "source": "assets/Open book/3D/open_book_3d.png",
+      "tone": "sky"
+    },
+    "diary-thirty": {
+      "file": "diary-thirty.png",
+      "source": "assets/Books/3D/books_3d.png",
+      "tone": "lilac"
+    },
+    "community": {
+      "file": "community.png",
+      "source": "assets/Sun with face/3D/sun_with_face_3d.png",
+      "tone": "gold"
+    },
+    "approved-first": {
+      "file": "approved-first.png",
+      "source": "assets/Sports medal/3D/sports_medal_3d.png",
+      "tone": "peach"
+    },
+    "approved-five": {
+      "file": "approved-five.png",
+      "source": "assets/Trophy/3D/trophy_3d.png",
+      "tone": "gold"
+    }
+  }
+}

@@ -20,12 +20,19 @@ repositories {
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-mail'
+	implementation 'org.springframework.session:spring-session-jdbc'
+	implementation 'org.springframework.security:spring-security-oauth2-jose'
 	implementation 'com.fasterxml.jackson.core:jackson-databind'
+	implementation 'org.jsoup:jsoup:1.23.2'
+	implementation 'com.twelvemonkeys.imageio:imageio-webp:3.13.1'
 	runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
 	runtimeOnly 'com.h2database:h2'
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.security:spring-security-test'
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
@@ -33,6 +40,14 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+// The frontend and search backend share one category taxonomy.
+tasks.named('processResources') {
+	from('../frontend/src/data') {
+		include 'categories.json', 'travel-preferences.json', 'regions.json'
+		into 'data'
+	}
 }
 
 tasks.withType(JavaCompile).configureEach {

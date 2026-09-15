@@ -1,6 +1,8 @@
 .env
 .env.local
 .env.production
+.env.*
+!.env.example
 node_modules/
 dist/
 build/
@@ -11,5 +13,11 @@ backend/data/
 *.class
 *.jar
 !backend/gradle/wrapper/gradle-wrapper.jar
-backup/*.sql
+backup/**
 !backup/README.md
+artifacts/
+runtime/
+deploy/windows/*.exe
+deploy/windows/*.wrapper.log
+deploy/windows/*.out.log
+deploy/windows/*.err.log

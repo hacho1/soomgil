@@ -1,0 +1,52 @@
+[
+  {
+    "file": "all.png",
+    "bytes": 47756,
+    "sha256": "f170580a2a2f70662e1de8c76d8263c33202f66f4002e57ad89c997a1b3dc488"
+  },
+  {
+    "file": "tour.png",
+    "bytes": 37744,
+    "sha256": "f1be4e3c04f152edd10eb5d44d850d09b8b3166cc27ca76db1aa19e0106a7cbb"
+  },
+  {
+    "file": "cafe.png",
+    "bytes": 44337,
+    "sha256": "edeaa3fca5eace5f2546efcd3b3e42ef1fd389a0c51d374dbf7863731db8f314"
+  },
+  {
+    "file": "food.png",
+    "bytes": 40374,
+    "sha256": "fa0516ce35666517a49daf7a62183c053dc5e99e9232f1bf5f7fbfb08d6ef0af"
+  },
+  {
+    "file": "walk.png",
+    "bytes": 20757,
+    "sha256": "4a510cfc89722a73bbb79e2148ae0719a49bdc62eb67bccc0f9b475e354f87f2"
+  },
+  {
+    "file": "camping.png",
+    "bytes": 44588,
+    "sha256": "c3b9a78c1b6df54884512f64b5b249feda7b071de29160cf4f4e28863cb87e62"
+  },
+  {
+    "file": "nature.png",
+    "bytes": 47258,
+    "sha256": "7923efeea75cd3ebfaf5589064b7ea5fd8c89d68d17555c5083f28483300fc48"
+  },
+  {
+    "file": "culture.png",
+    "bytes": 37373,
+    "sha256": "b2a54a07b3f3bed1766254a37afd44f2237a3e5e76f88275215135cea994f8c3"
+  },
+  {
+    "file": "experience.png",
+    "bytes": 46740,
+    "sha256": "f41b716bda7149f0fbe5885878b88d40de5602d9164c0189b905113a30b42937"
+  },
+  {
+    "file": "photo.png",
+    "bytes": 35211,
+    "sha256": "1b16f78a3feb212e66c0263b81d651347d702383e4a23f6e0211f83c79d3c7e3"
+  }
+]

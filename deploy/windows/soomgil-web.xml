@@ -1,0 +1,18 @@
+<service>
+  <id>SoomgilWeb</id>
+  <name>Soomgil HTTPS</name>
+  <description>HTTPS and built frontend. Requires SOOMGIL_DOMAIN.</description>
+  <executable>%BASE%\caddy.exe</executable>
+  <arguments>run --config "%BASE%\..\Caddyfile" --adapter caddyfile</arguments>
+  <env name="SOOMGIL_WEB_ROOT" value="%BASE%\..\..\frontend\dist" />
+  <workingdirectory>%BASE%\..\..</workingdirectory>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <serviceaccount><username>NT AUTHORITY\LocalService</username></serviceaccount>
+  <onfailure action="restart" delay="10 sec" />
+  <onfailure action="restart" delay="30 sec" />
+  <onfailure action="restart" delay="60 sec" />
+  <stoptimeout>30 sec</stoptimeout>
+  <logpath>%BASE%\..\..\runtime\logs</logpath>
+  <log mode="roll-by-size"><sizeThreshold>10240</sizeThreshold><keepFiles>5</keepFiles></log>
+</service>

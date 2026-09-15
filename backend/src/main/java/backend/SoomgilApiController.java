@@ -3,6 +3,7 @@ package backend;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
@@ -20,6 +21,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
@@ -41,78 +45,181 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-@CrossOrigin(origins = {
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:4173",
-        "http://127.0.0.1:4173",
-        "http://iiri.hknu.ac.kr",
-        "https://iiri.hknu.ac.kr",
-        "http://220.68.241.128",
-        "https://220.68.241.128"
-})
 @RestController
 @RequestMapping("/api")
 public class SoomgilApiController {
     private static final Pattern USERNAME_PATTERN = Pattern.compile("^[a-z][a-z0-9_]{3,19}$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
-    private static final Pattern PASSWORD_PATTERN = Pattern.compile("^(?=.*[A-Za-z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,}$");
+    private static final Pattern PASSWORD_PATTERN = Pattern.compile("^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[^A-Za-z0-9\\s])\\S{8,72}$");
     private static final List<String> BANNED_WORDS = List.of(
             "씨발", "시발", "ㅅㅂ", "병신", "ㅂㅅ", "섹스", "야동", "좌빨", "수꼴"
     );
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
+    private final SessionAuth auth;
+    private final ProgressService progress;
+    private final TourCatalog tourCatalog;
+    private final SearchCatalog searchCatalog;
+    private final TravelPreferences preferences;
+    private final NaverIdentity naverIdentity;
+    private final TourDetails tourDetails;
+    private final ArchivedCrowd archivedCrowd;
+    private final CrowdForecast crowdForecast;
+    private final PlaceQueries placeQueries;
+    private final TourSyncService tourSync;
+    private final EmailVerification emailVerification;
+    private final AuthRateLimit authLimits;
+    private final DiscoveryRecommendations recommendations;
+    private final DiaryProtection diaryProtection;
+    private final HttpServletRequest request;
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final String dummyPasswordHash = passwordEncoder.encode("unused-login-timing-placeholder");
     private final SecureRandom secureRandom = new SecureRandom();
 
-    @Value("${soomgil.admin.code:ADMIN2026}")
-    private String adminCode;
+    @Value("${soomgil.demo-users:false}")
+    private boolean demoUsers;
 
-    public SoomgilApiController(JdbcTemplate jdbc, ObjectMapper mapper) {
+    @Value("${soomgil.google.client-id:}")
+    private String googleClientId;
+
+    public SoomgilApiController(JdbcTemplate jdbc, ObjectMapper mapper, SessionAuth auth, ProgressService progress, TourCatalog tourCatalog, SearchCatalog searchCatalog, TravelPreferences preferences, NaverIdentity naverIdentity, TourDetails tourDetails, ArchivedCrowd archivedCrowd, CrowdForecast crowdForecast, PlaceQueries placeQueries, TourSyncService tourSync, EmailVerification emailVerification, AuthRateLimit authLimits, HttpServletRequest request, DiscoveryRecommendations recommendations, DiaryProtection diaryProtection) {
         this.jdbc = jdbc;
         this.mapper = mapper;
+        this.auth = auth;
+        this.progress = progress;
+        this.tourCatalog = tourCatalog;
+        this.searchCatalog = searchCatalog;
+        this.preferences = preferences;
+        this.naverIdentity = naverIdentity;
+        this.tourDetails = tourDetails;
+        this.archivedCrowd = archivedCrowd;
+        this.crowdForecast = crowdForecast;
+        this.placeQueries = placeQueries; this.tourSync = tourSync;
+        this.emailVerification = emailVerification; this.authLimits = authLimits; this.request = request;
+        this.recommendations = recommendations;
+        this.diaryProtection = diaryProtection;
     }
 
     @PostConstruct
     public void initialize() {
         createSchema();
+        diaryProtection.initialize();
+        placeQueries.initialize();
         seedPlaces();
-        seedDefaultUsers();
+        restoreCatalog();
+        placeQueries.backfill();
+        if (demoUsers) seedDefaultUsers();
         seedNotice();
     }
 
     @GetMapping("/health")
     public Map<String, Object> health() {
+        jdbc.queryForObject("SELECT 1", Integer.class);
         return Map.of("ok", true, "service", "soomgil", "time", LocalDateTime.now().toString());
     }
 
+    @GetMapping("/auth/csrf")
+    public Map<String, String> csrf(CsrfToken token) {
+        return Map.of("token", token.getToken());
+    }
+
+    @GetMapping("/auth/config")
+    public Map<String, Object> authConfig() {
+        return Map.of("googleClientId", googleClientId, "emailVerificationAvailable", emailVerification.available(), "naverAvailable", naverIdentity.available());
+    }
+
+    @GetMapping("/auth/me")
+    public Map<String, Object> me() {
+        return Map.of("user", userResponse(auth.requireUser()));
+    }
+
+    @PostMapping("/auth/logout")
+    public Map<String, Object> logout() {
+        auth.logout();
+        return Map.of("ok", true);
+    }
+
     @GetMapping("/places")
-    public List<Map<String, Object>> places(
-            @RequestParam(defaultValue = "") String query,
-            @RequestParam(defaultValue = "") String region,
-            @RequestParam(defaultValue = "") String category,
-            @RequestParam(defaultValue = "recommended") String sort
-    ) {
-        List<Map<String, Object>> rows = jdbc.queryForList("SELECT * FROM places");
-        String q = normalize(query);
-        String regionText = normalize(region);
-        String categoryText = normalize(category);
+    public List<Map<String, Object>> places(@RequestParam(defaultValue = "") String query, @RequestParam(defaultValue = "") String region,
+            @RequestParam(defaultValue = "") String category, @RequestParam(defaultValue = "recommended") String sort,
+            @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "60") int size) {
+        validateSearch(query, region, category, page, size);
+        return placeQueries.search(query, region, category, sort, page, size, recommendations.profile(auth.currentUser())).rows().stream().map(this::placeMap).toList();
+    }
 
-        List<Map<String, Object>> result = rows.stream()
-                .map(this::placeMap)
-                .filter(place -> matchesQuery(place, q))
-                .filter(place -> regionText.isBlank() || normalize(text(place.get("region"))).contains(regionText)
-                        || normalize(text(place.get("address"))).contains(regionText))
-                .filter(place -> categoryText.isBlank() || normalize(text(place.get("category"))).contains(categoryText)
-                        || normalize(text(place.get("categoryLabel"))).contains(categoryText)
-                        || normalize(text(place.get("tags"))).contains(categoryText))
-                .sorted(placeComparator(sort))
-                .toList();
-
-        if (!q.isBlank()) {
-            saveSearchLog("guest", query);
+    @GetMapping("/places/search")
+    public Map<String, Object> searchPlaces(@RequestParam(defaultValue = "") String query, @RequestParam(defaultValue = "") String region,
+            @RequestParam(defaultValue = "") String category, @RequestParam(defaultValue = "recommended") String sort,
+            @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "6") int size,
+            @RequestParam(defaultValue = "") String kind) {
+        validateSearch(query, region, category, page, size);
+        if (!List.of("", "place", "course").contains(kind)) throw badRequest("콘텐츠 종류를 확인해주세요.");
+        var profile = recommendations.profile(auth.currentUser());
+        var result = placeQueries.search(query, region, category, sort, page, size, profile, kind);
+        if (page == 1 && !query.isBlank() && result.total() > 0 && !auth.currentUser().isBlank()) {
+            saveSearchLog(auth.currentUser(), query); progress.record(auth.currentUser(), "search", SearchCatalog.fold(query));
         }
-        return result;
+        return pageResponse(result, profile);
+    }
+    private void validateSearch(String query, String region, String category, int page, int size) {
+        if (query.length() > 100 || region.length() > 30 || category.length() > 30 || page < 1 || page > 100000 || size < 1 || size > 60)
+            throw badRequest("검색 조건을 확인해주세요.");
+    }
+    private Map<String, Object> pageResponse(PlaceQueries.Page page) {
+        return pageResponse(page, DiscoveryRecommendations.Profile.guest());
+    }
+    private Map<String, Object> pageResponse(PlaceQueries.Page page, DiscoveryRecommendations.Profile profile) {
+        var items = page.rows().stream().map(row -> {
+            var item = placeMap(row);
+            if (row.get("distance_meters") instanceof Number distance) item.put("distanceMeters", distance.doubleValue());
+            recommendations.explain(item, profile, recommendations.today());
+            return item;
+        }).toList();
+        return Map.of("items", items, "total", page.total(), "page", page.page(), "pageSize", page.size(), "hasMore", page.hasMore(), "source", "database");
+    }
+    @GetMapping("/places/nearby")
+    public Map<String, Object> nearbyPlaces(@RequestParam double mapX, @RequestParam double mapY,
+            @RequestParam(defaultValue = "3000") int radius, @RequestParam(defaultValue = "") String category,
+            @RequestParam(defaultValue = "slow") String sort, @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "6") int size) {
+        validateSearch("", "", category, page, size);
+        if (!(mapX > 124 && mapX < 132 && mapY > 32 && mapY < 39) || radius < 500 || radius > 20000) throw badRequest("탐색 범위를 확인해주세요.");
+        return pageResponse(placeQueries.nearby(mapX, mapY, radius, category, sort, page, size));
+    }
+    @GetMapping("/places/home")
+    public Object homePlaces() {
+        return homeRecommendations().get("items");
+    }
+    @GetMapping("/places/recommendations")
+    public Map<String,Object> homeRecommendations() {
+        return recommendations.home(recommendations.profile(auth.currentUser()),this::placeMap);
+    }
+    @GetMapping("/places/status")
+    public Map<String, Object> catalogStatus() {
+        var result = new LinkedHashMap<>(tourCatalog.status()); result.put("sync", tourSync.status()); return result;
+    }
+    @GetMapping("/admin/place-sync")
+    public Map<String, Object> syncStatus() { requireAdmin(""); return tourSync.status(); }
+    @PostMapping("/admin/place-sync")
+    public Map<String, Object> controlSync(@RequestBody Map<String, String> body) {
+        requireAdmin("");
+        if (!List.of("pause", "resume", "run").contains(body.getOrDefault("action", ""))) throw badRequest("갱신 명령을 확인해주세요.");
+        tourSync.control(body.get("action")); return tourSync.status();
+    }
+
+    @GetMapping("/places/discover")
+    public Map<String, Object> discoverPlaces(@RequestParam(defaultValue = "") String region, @RequestParam(defaultValue = "") String category,
+                                              @RequestParam(defaultValue = "1") int page, @RequestParam(required = false) Double mapX,
+                                              @RequestParam(required = false) Double mapY, @RequestParam(defaultValue = "10000") int radius) {
+        if (page < 1 || page > 10000 || region.length() > 30 || category.length() > 30
+                || (!region.isBlank() && TourCatalog.legalAreaCode(region).isBlank())
+                || (mapX == null) != (mapY == null) || radius < 500 || radius > 20000
+                || (mapX != null && !(mapX > 124 && mapX < 132 && mapY > 32 && mapY < 39))) throw badRequest("탐색 범위를 확인해주세요.");
+        var feed = tourCatalog.discover(region, category, page, mapX, mapY, radius);
+        var items = feed.ids().stream().distinct().map(this::findPlaceRow).flatMap(Optional::stream)
+                .filter(this::published).map(this::placeMap).toList();
+        return Map.of("items", items, "state", feed.state(), "total", feed.total(), "page", feed.page(), "pageSize", feed.pageSize(),
+                "hasMore", feed.hasMore(), "storedTotal", jdbc.queryForObject("SELECT COUNT(*) FROM places WHERE approved=TRUE AND tour_visible=TRUE", Long.class));
     }
 
     @GetMapping("/places/{id}")
@@ -120,10 +227,47 @@ public class SoomgilApiController {
         Map<String, Object> row = findPlaceRow(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "장소를 찾을 수 없습니다."));
         Map<String, Object> place = placeMap(row);
-        place.put("recommendationReason", recommendationReason(place));
-        place.put("halfDayCourse", halfDayCourse(place));
-        place.put("nearbyHiddenPlaces", nearbyHiddenPlaces(id));
+        if (!published(row)) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "장소를 찾을 수 없습니다.");
+        place = refreshCrowd(place);
+        if (!auth.currentUser().isBlank()) {
+            String userId = auth.currentUser();
+            jdbc.update("DELETE FROM recent_views WHERE user_id=? AND place_id=?", userId, id);
+            jdbc.update("INSERT INTO recent_views(user_id,place_id,viewed_at) VALUES(?,?,?)", userId, id, LocalDateTime.now());
+            progress.record(userId, "view", String.valueOf(id));
+        }
+        var profile = recommendations.profile(auth.currentUser());
+        recommendations.explain(place, profile, recommendations.today());
+        var nearby = recommendations.nearby(place, profile, this::placeMap);
+        place.put("halfDayCourse", halfDayCourse(place, nearby));
+        place.put("nearbyHiddenPlaces", nearby);
         return place;
+    }
+
+    @GetMapping("/places/{id}/crowd-info")
+    public Map<String, Object> crowdInfo(@PathVariable long id) {
+        var row = findPlaceRow(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "장소를 찾을 수 없습니다."));
+        if (!published(row)) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "장소를 찾을 수 없습니다.");
+        return refreshCrowd(placeMap(row));
+    }
+
+    private Map<String, Object> refreshCrowd(Map<String, Object> place) {
+        if ("course".equals(place.get("contentKind"))) { place.put("crowdStatus","unsupported"); return place; }
+        String source = text(place.get("source"));
+        if (!source.startsWith("tour-api:") && !source.equals("recovered-tour-api")) {
+            place.put("crowdStatus", "unsupported");
+            return place;
+        }
+        // Catalog metadata is refreshed by the DB sync, not by each visible card.
+        crowdForecast.refresh(place);
+        crowdForecast.apply(place);
+        return place;
+    }
+
+    @GetMapping("/places/{id}/visit-info")
+    public Map<String, Object> visitInfo(@PathVariable long id) {
+        var row = findPlaceRow(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "장소를 찾을 수 없습니다."));
+        if (!published(row)) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "장소를 찾을 수 없습니다.");
+        return tourDetails.get(placeMap(row));
     }
 
     @GetMapping("/places/{id}/reviews")
@@ -131,6 +275,7 @@ public class SoomgilApiController {
             @PathVariable long id,
             @RequestParam(defaultValue = "latest") String sort
     ) {
+        ensurePlace(id);
         String order = "likes".equals(sort) ? "like_count DESC, created_at DESC" : "created_at DESC";
         return jdbc.queryForList("SELECT * FROM reviews WHERE place_id=? ORDER BY " + order, id).stream()
                 .map(this::reviewMap)
@@ -138,32 +283,34 @@ public class SoomgilApiController {
     }
 
     @PostMapping("/places/{id}/reviews")
+    @Transactional
     public Map<String, Object> createReview(@PathVariable long id, @RequestBody Map<String, Object> body) {
         String userId = defaultUser(body.get("userId"));
         String text = requireText(body.get("text"), "후기 내용을 입력해주세요.");
         rejectBannedText(text);
+        if (text.length() > 2000) throw badRequest("후기는 2,000자까지 입력할 수 있습니다.");
         ensurePlace(id);
         jdbc.update(
                 "INSERT INTO reviews(created_at,rating,text,user_id,place_id,like_count,liked_by_json) VALUES(?,?,?,?,?,?,?)",
                 LocalDateTime.now(), 0, text, userId, id, 0, "[]"
         );
+        progress.record(userId, "review", String.valueOf(id));
         return Map.of("ok", true, "reviews", reviews(id, "latest"));
     }
 
     @DeleteMapping("/reviews/{id}")
-    public Map<String, Object> deleteReview(@PathVariable long id, @RequestParam String userId) {
-        if ("admin".equals(userId)) {
-            jdbc.update("DELETE FROM reviews WHERE id=?", id);
-        } else {
-            jdbc.update("DELETE FROM reviews WHERE id=? AND user_id=?", id, userId);
-        }
+    public Map<String, Object> deleteReview(@PathVariable long id) {
+        String userId = auth.requireUser();
+        requireOwned("reviews", id, userId);
+        jdbc.update("DELETE FROM reviews WHERE id=? AND user_id=?", id, userId);
         return Map.of("ok", true);
     }
 
     @PostMapping("/reviews/{id}/like")
+    @Transactional
     public Map<String, Object> likeReview(@PathVariable long id, @RequestBody Map<String, Object> body) {
         String userId = defaultUser(body.get("userId"));
-        Map<String, Object> review = jdbc.queryForMap("SELECT * FROM reviews WHERE id=?", id);
+        Map<String, Object> review = jdbc.queryForMap("SELECT * FROM reviews WHERE id=? FOR UPDATE", id);
         Set<String> likedBy = new LinkedHashSet<>(readStringList(text(value(review, "liked_by_json"))));
         boolean liked = likedBy.contains(userId);
         if (liked) {
@@ -180,11 +327,13 @@ public class SoomgilApiController {
     }
 
     @GetMapping("/auth/users/exists")
-    public Map<String, Object> userExists(
-            @RequestParam(defaultValue = "") String username,
-            @RequestParam(defaultValue = "") String email,
-            @RequestParam(defaultValue = "") String phone
-    ) {
+    public Map<String, Object> usernameExists(@RequestParam(defaultValue = "") String username) {
+        authLimits.take("username-check", AuthRateLimit.client(request), 30, java.time.Duration.ofMinutes(15));
+        if (!USERNAME_PATTERN.matcher(username).matches()) throw badRequest("아이디 형식을 확인해주세요.");
+        return Map.of("usernameExists", count("SELECT COUNT(*) FROM user_accounts WHERE username=?", username) > 0 || auth.isReservedUsername(username));
+    }
+
+    private Map<String, Object> userExists(String username, String email, String phone) {
         return Map.of(
                 "usernameExists", !username.isBlank() && count("SELECT COUNT(*) FROM user_accounts WHERE username=?", username) > 0,
                 "emailExists", !email.isBlank() && count("SELECT COUNT(*) FROM user_accounts WHERE email=?", email) > 0,
@@ -193,28 +342,38 @@ public class SoomgilApiController {
     }
 
     @PostMapping("/auth/signup")
+    @Transactional
     public Map<String, Object> signup(@RequestBody Map<String, Object> body) {
-        String fullName = requireText(body.get("fullName"), "성명을 입력해주세요.");
-        String username = requireText(body.get("username"), "아이디를 입력해주세요.").toLowerCase(Locale.ROOT);
+        String fullName = text(body.get("fullName")).trim();
+        boolean emailOnly = text(body.get("username")).isBlank();
+        String username = (emailOnly ? "u" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16) : text(body.get("username"))).trim().toLowerCase(Locale.ROOT);
+        String nickname = requireText(emailOnly ? body.get("nickname") : body.getOrDefault("nickname", username.substring(0, Math.min(16, username.length()))), "닉네임을 입력해주세요.");
         String password = requireText(body.get("password"), "비밀번호를 입력해주세요.");
         String email = requireText(body.get("email"), "이메일을 입력해주세요.").toLowerCase(Locale.ROOT);
-        String phone = requireText(body.get("phone"), "전화번호를 입력해주세요.");
+        String phone = text(body.get("phone")).replaceAll("[\\s-]", "");
         boolean consent = bool(body.get("privacyConsent"));
 
         if (!USERNAME_PATTERN.matcher(username).matches()) {
             throw badRequest("아이디는 영문 소문자로 시작하고 영문/숫자/_ 포함 4~20자여야 합니다.");
         }
+        if (auth.isReservedUsername(username)) throw badRequest("사용할 수 없는 아이디입니다.");
+        rejectBannedText(nickname);
+        if (!nickname.matches("^[가-힣A-Za-z0-9_]{2,16}$")) throw badRequest("닉네임은 한글, 영문, 숫자, _로 2~16자까지 입력해주세요.");
         if (!EMAIL_PATTERN.matcher(email).matches()) {
             throw badRequest("이메일 형식을 확인해주세요.");
         }
         if (!PASSWORD_PATTERN.matcher(password).matches()) {
-            throw badRequest("비밀번호는 영문, 숫자, 특수문자를 포함해 8자 이상이어야 합니다.");
+            throw badRequest("비밀번호는 영문 대소문자, 숫자, 특수문자를 포함한 8~72자여야 합니다.");
         }
+        if (!password.equals(text(body.get("passwordConfirm")))) throw badRequest("비밀번호 확인이 일치하지 않습니다.");
+        if (!phone.isBlank() && !phone.matches("^01[016789]\\d{7,8}$")) throw badRequest("휴대폰 번호를 확인해주세요.");
+        if (fullName.length() > 50 || email.length() > 254) throw badRequest("입력한 내용이 너무 깁니다.");
         if (!consent) {
             throw badRequest("개인정보보호 동의가 필요합니다.");
         }
         rejectBannedText(username);
 
+        emailVerification.consume(body.get("emailProof"), email, "signup", "");
         Map<String, Object> exists = userExists(username, email, phone);
         if (bool(exists.get("usernameExists")) || bool(exists.get("emailExists")) || bool(exists.get("phoneExists"))) {
             throw badRequest("이미 가입된 사용자입니다.");
@@ -223,40 +382,54 @@ public class SoomgilApiController {
         jdbc.update("""
                 INSERT INTO user_accounts(email,email_verified,full_name,joined_at,password_hash,phone,phone_verified,privacy_consent,username,auth_provider,provider_id)
                 VALUES(?,?,?,?,?,?,?,?,?,?,?)
-                """, email, true, fullName, LocalDateTime.now(), hashPassword(password), phone, true, consent, username, "local", username);
+                """, email, true, fullName, LocalDateTime.now(), hashPassword(password), phone.isBlank() ? null : phone, false, consent, username, "local", username);
         upsertUserSetting(username, fullName, email, phone);
+        jdbc.update("UPDATE user_settings SET nickname=?,email_verified=TRUE WHERE user_id=?", nickname, username);
+        preferences.createForNewUser(username);
+        auth.login(username, false);
         createNotification(username, "welcome", "새로운 알림이 도착했어요!", "숨길 가입이 완료되었습니다.", "user", username);
         return Map.of("ok", true, "user", userResponse(username));
     }
 
     @PostMapping("/auth/login")
     public Map<String, Object> login(@RequestBody Map<String, Object> body) {
+        authLimits.take("login-ip", AuthRateLimit.client(request), 30, java.time.Duration.ofMinutes(15));
         String identifier = requireText(body.get("identifier"), "아이디 또는 이메일을 입력해주세요.").toLowerCase(Locale.ROOT);
         String password = requireText(body.get("password"), "비밀번호를 입력해주세요.");
+        if (identifier.length() > 254 || password.length() > 72) throw badRequest("로그인 입력 길이를 확인해주세요.");
         if (!USERNAME_PATTERN.matcher(identifier).matches() && !EMAIL_PATTERN.matcher(identifier).matches()) {
             throw badRequest("아이디 또는 이메일 형식을 확인해주세요.");
         }
 
-        Map<String, Object> account = findAccount(identifier)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "가입된 사용자를 찾을 수 없습니다."));
-        String storedHash = text(value(account, "password_hash"));
-        if (!verifyPassword(password, storedHash)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "비밀번호가 올바르지 않습니다.");
+        Map<String, Object> account = findAccount(identifier).orElse(null);
+        String bucket = account == null ? identifier : text(value(account, "username"));
+        authLimits.take("login-account", bucket, 5, java.time.Duration.ofMinutes(15));
+        String storedHash = account == null ? dummyPasswordHash : text(value(account, "password_hash"));
+        if (storedHash.startsWith("oauth$")) storedHash = dummyPasswordHash;
+        boolean valid = verifyPassword(password, storedHash);
+        if (account == null || !"local".equals(text(value(account, "auth_provider"))) || !valid) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호를 확인해주세요.");
         }
         String username = text(value(account, "username"));
+        authLimits.clear("login-account", username);
+        if (storedHash.startsWith("pbkdf2$")) jdbc.update("UPDATE user_accounts SET password_hash=? WHERE username=?", hashPassword(password), username);
+        auth.login(username, bool(body.get("autoLogin")));
         jdbc.update("UPDATE user_settings SET logged_in=? WHERE user_id=?", true, username);
         return Map.of("ok", true, "user", userResponse(username));
     }
 
     @PostMapping("/auth/google")
+    @Transactional
     public Map<String, Object> googleLogin(@RequestBody Map<String, Object> body) {
-        String email = requireText(body.get("email"), "구글 이메일을 확인할 수 없습니다.").toLowerCase(Locale.ROOT);
-        String fullName = textOr(body.get("fullName"), email.substring(0, email.indexOf("@")));
-        String providerId = textOr(body.get("providerId"), email);
+        if (googleClientId.isBlank()) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Google 로그인 연결을 준비하고 있습니다.");
+        var claims = GoogleIdentity.verify(requireText(body.get("credential"), "Google 인증이 필요합니다."), googleClientId);
+        String email = claims.getClaimAsString("email").toLowerCase(Locale.ROOT);
+        String fullName = textOr(claims.getClaimAsString("name"), email.substring(0, email.indexOf("@")));
+        String providerId = claims.getSubject();
         String username = normalizeUsername(textOr(body.get("username"), email.substring(0, email.indexOf("@"))));
         int suffix = 1;
         String base = username;
-        while (count("SELECT COUNT(*) FROM user_accounts WHERE username=? AND email<>?", username, email) > 0) {
+        while (auth.isReservedUsername(username) || count("SELECT COUNT(*) FROM user_accounts WHERE username=? AND email<>?", username, email) > 0) {
             username = base + suffix++;
         }
 
@@ -267,31 +440,107 @@ public class SoomgilApiController {
                     VALUES(?,?,?,?,?,?,?,?,?,?,?)
                     """, email, true, fullName, LocalDateTime.now(), "oauth$google$" + providerId, "google:" + providerId, false, true, username, "google", providerId);
             upsertUserSetting(username, fullName, email, "");
+            preferences.createForNewUser(username);
         } else {
+            if (!"google".equals(text(value(account.get(), "auth_provider"))) || !providerId.equals(text(value(account.get(), "provider_id")))) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "이 이메일로 가입한 계정이 있습니다. 기존 아이디와 비밀번호로 로그인해주세요.");
+            }
             username = text(value(account.get(), "username"));
         }
+        auth.login(username, bool(body.get("autoLogin")));
         return Map.of("ok", true, "user", userResponse(username));
     }
 
+    public Optional<String> findNaverUsername(String providerId) {
+        return jdbc.queryForList("SELECT username FROM user_accounts WHERE auth_provider='naver' AND provider_id=?", String.class, providerId).stream().findFirst();
+    }
+
+    public boolean naverEmailConflict(String email) {
+        return !email.isBlank() && count("SELECT COUNT(*) FROM user_accounts WHERE email=?", email.trim().toLowerCase(Locale.ROOT)) > 0;
+    }
+
+    public String naverNickname(String supplied) {
+        try {
+            rejectBannedText(supplied);
+            if (supplied.matches("^[가-힣A-Za-z0-9_]{2,16}$")) return supplied;
+        } catch (ResponseStatusException ignored) { }
+        return "여행친구";
+    }
+
+    @Transactional
+    public String registerNaver(NaverIdentity.Profile profile, Map<String, Object> body) {
+        if (!Boolean.TRUE.equals(body.get("privacyConsent"))) throw badRequest("개인정보 수집·이용 동의가 필요합니다.");
+        String nickname = text(body.get("nickname")).trim();
+        rejectBannedText(nickname);
+        if (!nickname.matches("^[가-힣A-Za-z0-9_]{2,16}$")) throw badRequest("닉네임은 한글, 영문, 숫자, _로 2~16자까지 입력해주세요.");
+        var existing = findNaverUsername(profile.id());
+        if (existing.isPresent()) return existing.get();
+        String email = (profile.email().isBlank() ? text(body.get("email")) : profile.email()).trim().toLowerCase(Locale.ROOT);
+        if (email.length() > 254 || !EMAIL_PATTERN.matcher(email).matches()) throw badRequest("연락받을 이메일 주소를 입력해주세요.");
+        if (naverEmailConflict(email)) throw new ResponseStatusException(HttpStatus.CONFLICT, "이 이메일로 가입한 계정이 있어요. 기존 로그인 방법으로 로그인해주세요.");
+        String username;
+        do { username = "n" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16); }
+        while (auth.isReservedUsername(username) || count("SELECT COUNT(*) FROM user_accounts WHERE username=?", username) > 0);
+        jdbc.update("""
+                INSERT INTO user_accounts(email,email_verified,full_name,joined_at,password_hash,phone,phone_verified,privacy_consent,username,auth_provider,provider_id)
+                VALUES(?,FALSE,'',?,?,NULL,FALSE,TRUE,?,'naver',?)
+                """, email, LocalDateTime.now(), "oauth$naver$" + profile.id(), username, profile.id());
+        upsertUserSetting(username, "", email, "");
+        jdbc.update("UPDATE user_settings SET nickname=? WHERE user_id=?", nickname, username);
+        if (!profile.image().isBlank()) jdbc.update("UPDATE user_settings SET profile_image=? WHERE user_id=?", profile.image(), username);
+        preferences.createForNewUser(username);
+        createNotification(username, "welcome", "새로운 알림이 도착했어요!", "숨길 가입이 완료되었습니다.", "user", username);
+        return username;
+    }
+
     @PostMapping("/auth/find-id")
+    @Transactional
     public Map<String, Object> findId(@RequestBody Map<String, Object> body) {
-        String email = text(body.get("email")).toLowerCase(Locale.ROOT);
-        String phone = text(body.get("phone"));
-        List<Map<String, Object>> rows = jdbc.queryForList("SELECT username FROM user_accounts WHERE email=? OR phone=?", email, phone);
-        return Map.of("ok", true, "usernames", rows.stream().map(row -> text(value(row, "username"))).toList());
+        String email = EmailVerification.email(body.get("email"));
+        var proof = emailVerification.consume(body.get("emailProof"), email, "find-id", null);
+        var account = emailVerification.verifiedAccount(proof);
+        return Map.of("username", value(account, "username"), "email", email, "provider", value(account, "auth_provider"));
     }
 
     @PostMapping("/auth/reset-password")
+    @Transactional
     public Map<String, Object> resetPassword(@RequestBody Map<String, Object> body) {
-        String identifier = requireText(body.get("identifier"), "아이디 또는 이메일을 입력해주세요.").toLowerCase(Locale.ROOT);
-        String newPassword = requireText(body.get("newPassword"), "새 비밀번호를 입력해주세요.");
-        if (!PASSWORD_PATTERN.matcher(newPassword).matches()) {
-            throw badRequest("비밀번호는 영문, 숫자, 특수문자를 포함해 8자 이상이어야 합니다.");
-        }
-        Map<String, Object> account = findAccount(identifier).orElseThrow(() -> badRequest("사용자를 찾을 수 없습니다."));
-        jdbc.update("UPDATE user_accounts SET password_hash=? WHERE username=?",
-                hashPassword(newPassword), text(value(account, "username")));
-        return Map.of("ok", true, "message", "비밀번호가 변경되었습니다.");
+        String email = EmailVerification.email(body.get("email"));
+        String password = text(body.get("newPassword"));
+        if (!PASSWORD_PATTERN.matcher(password).matches()) throw badRequest("비밀번호는 영문 대소문자, 숫자, 특수문자를 포함한 8~72자여야 합니다.");
+        if (!password.equals(text(body.get("passwordConfirm")))) throw badRequest("비밀번호 확인이 일치하지 않습니다.");
+        var proof = emailVerification.consume(body.get("emailProof"), email, "reset-password", null);
+        var account = emailVerification.verifiedAccount(proof);
+        if (!"local".equals(value(account, "auth_provider"))) throw badRequest("소셜 로그인 계정은 Google 또는 네이버에서 비밀번호를 관리해주세요.");
+        String username = value(account, "username").toString();
+        jdbc.update("UPDATE user_accounts SET password_hash=? WHERE username=?", hashPassword(password), username);
+        jdbc.update("DELETE FROM SPRING_SESSION WHERE PRINCIPAL_NAME=?", username);
+        emailVerification.passwordChanged(username, email);
+        if (username.equals(auth.currentUser())) auth.logout();
+        return Map.of("ok", true);
+    }
+
+    @PostMapping("/auth/email/request")
+    public Map<String, Object> requestEmail(@RequestBody Map<String, Object> body) {
+        String purpose = text(body.get("purpose"));
+        String owner = (purpose.equals("change-email") || purpose.equals("verify-email")) ? auth.requireUser() : "";
+        return emailVerification.request(EmailVerification.email(body.get("email")), purpose, owner, AuthRateLimit.client(request));
+    }
+
+    @PostMapping("/auth/email/confirm")
+    public Map<String, Object> confirmEmail(@RequestBody Map<String, Object> body) {
+        return emailVerification.confirm(text(body.get("challengeId")), text(body.get("code")), AuthRateLimit.client(request));
+    }
+
+    @PostMapping("/auth/verify-email")
+    @Transactional
+    public Map<String, Object> verifyAccountEmail(@RequestBody Map<String, Object> body) {
+        String username = auth.requireUser(), email = EmailVerification.email(body.get("email"));
+        var proof = emailVerification.consume(body.get("emailProof"), email, "verify-email", username);
+        emailVerification.verifiedAccount(proof);
+        jdbc.update("UPDATE user_accounts SET email_verified=TRUE WHERE username=?", username);
+        jdbc.update("UPDATE user_settings SET email_verified=TRUE WHERE user_id=?", username);
+        return Map.of("ok", true);
     }
 
     @GetMapping("/users/{userId}/settings")
@@ -300,18 +549,36 @@ public class SoomgilApiController {
         return userResponse(userId);
     }
 
+    @PutMapping("/users/{userId}/preferences")
+    @Transactional
+    public Map<String, Object> updatePreferences(@PathVariable String userId, @RequestBody Map<String, Object> body) {
+        auth.requireOwner(userId);
+        ensureUserSetting(userId);
+        preferences.save(userId, body);
+        return Map.of("ok", true, "user", userResponse(userId));
+    }
+
     @PutMapping("/users/{userId}/settings")
+    @Transactional
     public Map<String, Object> updateSettings(@PathVariable String userId, @RequestBody Map<String, Object> body) {
         ensureUserSetting(userId);
         String[] columns = {"nickname", "profile_image", "profile_border", "interests_json", "display_badge_ids_json",
-                "dark_mode", "email", "phone", "address_sido", "address_sigungu", "address_eupmyeondong", "notification_enabled"};
+                "dark_mode", "address_sido", "address_sigungu", "address_eupmyeondong", "notification_enabled"};
         for (String column : columns) {
             String camel = toCamel(column);
             if (body.containsKey(camel) || body.containsKey(column)) {
                 Object value = body.containsKey(camel) ? body.get(camel) : body.get(column);
                 if ("nickname".equals(column)) {
                     rejectBannedText(text(value));
+                    if (!text(value).matches("^[가-힣A-Za-z0-9_]{2,16}$")) throw badRequest("닉네임은 한글, 영문, 숫자, _로 2~16자까지 입력해주세요.");
                 }
+                if (column.equals("profile_image")) validateImage(text(value));
+                if (column.equals("interests_json")) value = preferences.interestsJson(value);
+                if (column.equals("display_badge_ids_json")) {
+                    var ids = readStringList(text(value));
+                    if (ids.size() > 3 || new LinkedHashSet<>(ids).size() != ids.size() || !progress.earnedIds(userId).containsAll(ids)) throw badRequest("획득한 배지만 최대 3개 전시할 수 있습니다.");
+                }
+                if (column.startsWith("address_") && !text(value).matches("^[가-힣a-zA-Z\\s]{0,50}$")) throw badRequest("주소에는 시·도, 시·군·구, 읍·면·동 이름만 입력해주세요.");
                 jdbc.update("UPDATE user_settings SET " + column + "=? WHERE user_id=?", value, userId);
             }
         }
@@ -323,18 +590,21 @@ public class SoomgilApiController {
         return jdbc.queryForList("""
                 SELECT p.* FROM favorites f
                 JOIN places p ON p.id=f.place_id
-                WHERE f.user_id=?
+                WHERE f.user_id=? AND p.approved=TRUE AND p.tour_visible=TRUE
                 ORDER BY f.created_at DESC
                 """, userId).stream().map(this::placeMap).toList();
     }
 
     @PostMapping("/users/{userId}/favorites")
+    @Transactional
     public Map<String, Object> addFavorite(@PathVariable String userId, @RequestBody Map<String, Object> body) {
         long placeId = number(body.get("placeId"));
         ensurePlace(placeId);
+        jdbc.queryForList("SELECT username FROM user_accounts WHERE username=? FOR UPDATE", userId);
         if (count("SELECT COUNT(*) FROM favorites WHERE user_id=? AND place_id=?", userId, placeId) == 0) {
             jdbc.update("INSERT INTO favorites(user_id,created_at,place_id) VALUES(?,?,?)", userId, LocalDateTime.now(), placeId);
         }
+        progress.record(userId, "favorite", String.valueOf(placeId));
         return Map.of("ok", true, "favorites", favorites(userId));
     }
 
@@ -356,12 +626,14 @@ public class SoomgilApiController {
     }
 
     @PostMapping("/users/{userId}/following/{targetId}")
+    @Transactional
     public Map<String, Object> follow(@PathVariable String userId, @PathVariable String targetId) {
         if (userId.equals(targetId)) {
             throw badRequest("자기 자신은 팔로우할 수 없습니다.");
         }
         ensureUserSetting(userId);
-        ensureUserSetting(targetId);
+        if (findAccount(targetId).isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다.");
+        jdbc.queryForList("SELECT username FROM user_accounts WHERE username=? FOR UPDATE", userId);
         if (count("SELECT COUNT(*) FROM follows WHERE follower_id=? AND following_id=?", userId, targetId) == 0) {
             jdbc.update("INSERT INTO follows(follower_id,following_id,created_at) VALUES(?,?,?)", userId, targetId, LocalDateTime.now());
             createNotification(targetId, "follow", "새로운 알림이 도착했어요!", userId + "님이 회원님을 팔로우했습니다.", "user", userId);
@@ -401,7 +673,7 @@ public class SoomgilApiController {
                 SELECT DISTINCT p.* FROM follows fo
                 JOIN favorites f ON f.user_id=fo.following_id
                 JOIN places p ON p.id=f.place_id
-                WHERE fo.follower_id=?
+                WHERE fo.follower_id=? AND p.approved=TRUE AND p.tour_visible=TRUE
                 ORDER BY p.name
                 """, userId).stream().map(this::placeMap).toList();
     }
@@ -409,15 +681,90 @@ public class SoomgilApiController {
     @GetMapping("/users/{userId}/notifications")
     public List<Map<String, Object>> notifications(@PathVariable String userId) {
         return jdbc.queryForList("""
-                SELECT * FROM notifications
-                WHERE user_id=? OR user_id='*'
-                ORDER BY created_at DESC
-                """, userId).stream().map(this::notificationMap).toList();
+                SELECT n.*, CASE WHEN r.notification_id IS NOT NULL THEN TRUE ELSE FALSE END AS user_read
+                FROM notifications n LEFT JOIN notification_reads r ON n.id=r.notification_id AND r.user_id=?
+                WHERE n.user_id=? OR n.user_id='*'
+                ORDER BY n.created_at DESC LIMIT 100
+                """, userId, userId).stream().map(row -> {
+                    var result = new LinkedHashMap<>(notificationMap(row));
+                    result.put("read", bool(value(row, "user_read")) || (!"*".equals(text(value(row, "user_id"))) && bool(value(row, "read_flag"))));
+                    return (Map<String, Object>) result;
+                }).toList();
     }
 
     @PutMapping("/users/{userId}/notifications/read")
     public Map<String, Object> readNotifications(@PathVariable String userId) {
-        jdbc.update("UPDATE notifications SET read_flag=? WHERE user_id=?", true, userId);
+        for (Map<String, Object> note : notifications(userId)) markNotification(userId, number(note.get("id")));
+        return Map.of("ok", true);
+    }
+
+    @PutMapping("/users/{userId}/notifications/{id}/read")
+    public Map<String, Object> markNotification(@PathVariable String userId, @PathVariable long id) {
+        if (count("SELECT COUNT(*) FROM notifications WHERE id=? AND (user_id=? OR user_id='*')", id, userId) == 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다.");
+        if (count("SELECT COUNT(*) FROM notification_reads WHERE user_id=? AND notification_id=?", userId, id) == 0)
+            jdbc.update("INSERT INTO notification_reads(user_id,notification_id) VALUES(?,?)", userId, id);
+        return Map.of("ok", true);
+    }
+
+    @GetMapping("/users/{userId}/recent-views")
+    public List<Map<String, Object>> recentViews(@PathVariable String userId) {
+        return jdbc.queryForList("SELECT p.* FROM places p JOIN (SELECT place_id, MAX(viewed_at) AS last_view FROM recent_views WHERE user_id=? GROUP BY place_id) r ON r.place_id=p.id WHERE p.approved=TRUE AND p.tour_visible=TRUE ORDER BY r.last_view DESC LIMIT 20", userId).stream().map(this::placeMap).toList();
+    }
+
+    @GetMapping("/users/{userId}/reviews")
+    public List<Map<String, Object>> myReviews(@PathVariable String userId) {
+        return jdbc.queryForList("SELECT r.*, p.name AS place_name FROM reviews r JOIN places p ON p.id=r.place_id WHERE r.user_id=? ORDER BY r.created_at DESC", userId).stream().map(row -> {
+            var review = new LinkedHashMap<>(reviewMap(row));
+            review.put("placeName", text(value(row, "place_name")));
+            return (Map<String, Object>) review;
+        }).toList();
+    }
+
+    @GetMapping("/users/{userId}/progress")
+    public Map<String, Object> userProgress(@PathVariable String userId) { return progress.summary(userId); }
+
+    @GetMapping("/people")
+    public List<Map<String, Object>> searchPeople(@RequestParam(defaultValue = "") String query) {
+        String q = query.trim();
+        if (q.length() < 2 || q.length() > 30) return List.of();
+        return people("SELECT s.* FROM user_settings s JOIN user_accounts a ON s.user_id=a.username WHERE LOWER(s.nickname) LIKE LOWER(?) ORDER BY s.nickname LIMIT 20", "%" + q.replace("%", "\\%").replace("_", "\\_") + "%");
+    }
+
+    @GetMapping("/users/{userId}/place-submissions")
+    public List<Map<String, Object>> userSubmissions(@PathVariable String userId) {
+        return jdbc.queryForList("SELECT * FROM place_submissions WHERE user_id=? ORDER BY created_at DESC", userId).stream().map(this::submissionMap).toList();
+    }
+
+    @PutMapping("/users/{userId}/account")
+    @Transactional
+    public Map<String, Object> updateAccount(@PathVariable String userId, @RequestBody Map<String, Object> body) {
+        auth.requireOwner(userId);
+        authLimits.take("account-password", userId, 5, java.time.Duration.ofMinutes(15));
+        var account = findAccount(userId).orElseThrow(() -> badRequest("계정을 찾을 수 없습니다."));
+        if (!verifyPassword(text(body.get("currentPassword")), text(value(account, "password_hash")))) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "현재 비밀번호를 확인해주세요.");
+        authLimits.clear("account-password", userId);
+        if (body.containsKey("email")) {
+            String email = text(body.get("email")).trim().toLowerCase(Locale.ROOT);
+            if (!EMAIL_PATTERN.matcher(email).matches() || email.length() > 254) throw badRequest("이메일 형식을 확인해주세요.");
+            var proof = emailVerification.consume(body.get("emailProof"), email, "change-email", userId);
+            emailVerification.verifiedAccount(proof);
+            jdbc.update("UPDATE user_accounts SET email=?, email_verified=TRUE WHERE username=?", email, userId);
+            jdbc.update("UPDATE user_settings SET email=?, email_verified=TRUE WHERE user_id=?", email, userId);
+        }
+        if (body.containsKey("phone")) {
+            String phone = text(body.get("phone")).replaceAll("[\\s-]", "");
+            if (!phone.matches("^01[016789]\\d{7,8}$")) throw badRequest("휴대폰 번호를 확인해주세요.");
+            jdbc.update("UPDATE user_accounts SET phone=?, phone_verified=FALSE WHERE username=?", phone, userId);
+            jdbc.update("UPDATE user_settings SET phone=?, phone_verified=FALSE WHERE user_id=?", phone, userId);
+        }
+        if (body.containsKey("newPassword")) {
+            String password = text(body.get("newPassword"));
+            if (!PASSWORD_PATTERN.matcher(password).matches()) throw badRequest("비밀번호는 영문 대소문자, 숫자, 특수문자를 포함한 8~72자여야 합니다.");
+            jdbc.update("UPDATE user_accounts SET password_hash=? WHERE username=?", hashPassword(password), userId);
+            jdbc.update("DELETE FROM SPRING_SESSION WHERE PRINCIPAL_NAME=?", userId);
+            emailVerification.passwordChanged(userId, text(value(account, "email")));
+            auth.logout();
+        }
         return Map.of("ok", true);
     }
 
@@ -434,8 +781,10 @@ public class SoomgilApiController {
     }
 
     @PostMapping("/admin/notices")
-    public Map<String, Object> createNotice(@RequestParam String adminCode, @RequestBody Map<String, Object> body) {
+    @Transactional
+    public Map<String, Object> createNotice(@RequestParam(defaultValue = "") String adminCode, @RequestBody Map<String, Object> body) {
         requireAdmin(adminCode);
+        validateNotice(body);
         String title = requireText(body.get("title"), "공지 제목을 입력해주세요.");
         String bodyText = requireText(body.get("body"), "공지 내용을 입력해주세요.");
         long id = insertAndGetId("""
@@ -447,8 +796,9 @@ public class SoomgilApiController {
     }
 
     @PutMapping("/admin/notices/{id}")
-    public Map<String, Object> updateNotice(@PathVariable long id, @RequestParam String adminCode, @RequestBody Map<String, Object> body) {
+    public Map<String, Object> updateNotice(@PathVariable long id, @RequestParam(defaultValue = "") String adminCode, @RequestBody Map<String, Object> body) {
         requireAdmin(adminCode);
+        validateNotice(body);
         jdbc.update("""
                 UPDATE notices SET title=?, body=?, body_size=?, body_weight=?, image_url=?, updated_at=? WHERE id=?
                 """, requireText(body.get("title"), "공지 제목을 입력해주세요."),
@@ -462,8 +812,11 @@ public class SoomgilApiController {
     }
 
     @DeleteMapping("/admin/notices/{id}")
-    public Map<String, Object> deleteNotice(@PathVariable long id, @RequestParam String adminCode) {
+    @Transactional
+    public Map<String, Object> deleteNotice(@PathVariable long id, @RequestParam(defaultValue = "") String adminCode) {
         requireAdmin(adminCode);
+        jdbc.update("DELETE FROM notification_reads WHERE notification_id IN (SELECT id FROM notifications WHERE reference_type='notice' AND reference_id=?)", String.valueOf(id));
+        jdbc.update("DELETE FROM notifications WHERE reference_type='notice' AND reference_id=?", String.valueOf(id));
         jdbc.update("DELETE FROM notices WHERE id=?", id);
         return Map.of("ok", true);
     }
@@ -477,6 +830,7 @@ public class SoomgilApiController {
 
     @PostMapping("/users/{userId}/inquiries")
     public Map<String, Object> createInquiry(@PathVariable String userId, @RequestBody Map<String, Object> body) {
+        validateInquiry(body);
         long id = insertAndGetId("""
                 INSERT INTO inquiries(user_id,title,body,status,created_at,updated_at) VALUES(?,?,?,?,?,?)
                 """, userId, requireText(body.get("title"), "문의 제목을 입력해주세요."),
@@ -487,6 +841,9 @@ public class SoomgilApiController {
 
     @PutMapping("/users/{userId}/inquiries/{id}")
     public Map<String, Object> updateInquiry(@PathVariable String userId, @PathVariable long id, @RequestBody Map<String, Object> body) {
+        requireOwned("inquiries", id, userId);
+        validateInquiry(body);
+        if ("답변완료".equals(inquiry(id).get("status"))) throw badRequest("답변이 완료된 문의는 수정할 수 없습니다.");
         jdbc.update("UPDATE inquiries SET title=?, body=?, updated_at=? WHERE id=? AND user_id=? AND status<>'답변완료'",
                 requireText(body.get("title"), "문의 제목을 입력해주세요."),
                 requireText(body.get("body"), "문의 내용을 입력해주세요."),
@@ -501,7 +858,7 @@ public class SoomgilApiController {
     }
 
     @GetMapping("/admin/inquiries")
-    public List<Map<String, Object>> adminInquiries(@RequestParam String adminCode) {
+public List<Map<String, Object>> adminInquiries(@RequestParam(defaultValue = "") String adminCode) {
         requireAdmin(adminCode);
         return jdbc.queryForList("SELECT * FROM inquiries ORDER BY created_at DESC").stream()
                 .map(this::inquiryMap)
@@ -509,7 +866,7 @@ public class SoomgilApiController {
     }
 
     @PutMapping("/admin/inquiries/{id}/reply")
-    public Map<String, Object> replyInquiry(@PathVariable long id, @RequestParam String adminCode, @RequestBody Map<String, Object> body) {
+public Map<String, Object> replyInquiry(@PathVariable long id, @RequestParam(defaultValue = "") String adminCode, @RequestBody Map<String, Object> body) {
         requireAdmin(adminCode);
         String reply = requireText(body.get("reply"), "답변 내용을 입력해주세요.");
         Map<String, Object> inquiry = inquiry(id);
@@ -520,13 +877,14 @@ public class SoomgilApiController {
     }
 
     @DeleteMapping("/admin/inquiries/{id}")
-    public Map<String, Object> deleteInquiryAdmin(@PathVariable long id, @RequestParam String adminCode) {
+public Map<String, Object> deleteInquiryAdmin(@PathVariable long id, @RequestParam(defaultValue = "") String adminCode) {
         requireAdmin(adminCode);
         jdbc.update("DELETE FROM inquiries WHERE id=?", id);
         return Map.of("ok", true);
     }
 
     @PostMapping("/place-submissions")
+    @Transactional
     public Map<String, Object> createPlaceSubmission(@RequestBody Map<String, Object> body) {
         String userId = defaultUser(body.get("userId"));
         long id = insertAndGetId("""
@@ -540,11 +898,12 @@ public class SoomgilApiController {
                 text(body.get("description")),
                 "대기",
                 LocalDateTime.now());
+        progress.record(userId, "submission", String.valueOf(id));
         return Map.of("ok", true, "submission", submission(id));
     }
 
     @GetMapping("/admin/place-submissions")
-    public List<Map<String, Object>> placeSubmissions(@RequestParam String adminCode) {
+public List<Map<String, Object>> placeSubmissions(@RequestParam(defaultValue = "") String adminCode) {
         requireAdmin(adminCode);
         return jdbc.queryForList("SELECT * FROM place_submissions ORDER BY created_at DESC").stream()
                 .map(this::submissionMap)
@@ -552,7 +911,8 @@ public class SoomgilApiController {
     }
 
     @PutMapping("/admin/place-submissions/{id}")
-    public Map<String, Object> updatePlaceSubmission(@PathVariable long id, @RequestParam String adminCode, @RequestBody Map<String, Object> body) {
+    @Transactional
+public Map<String, Object> updatePlaceSubmission(@PathVariable long id, @RequestParam(defaultValue = "") String adminCode, @RequestBody Map<String, Object> body) {
         requireAdmin(adminCode);
         if (body.containsKey("name") || body.containsKey("address") || body.containsKey("description")) {
             jdbc.update("""
@@ -567,14 +927,19 @@ public class SoomgilApiController {
         }
         if (body.containsKey("status")) {
             String status = text(body.get("status"));
+            if (!List.of("대기", "승인", "반려").contains(status)) throw badRequest("제보 상태를 확인해주세요.");
             jdbc.update("UPDATE place_submissions SET status=?, reviewed_at=? WHERE id=?", status, LocalDateTime.now(), id);
             Map<String, Object> sub = submission(id);
             String userId = text(sub.get("userId"));
             createNotification(userId, "place-submission", "새로운 알림이 도착했어요!", "제보한 장소가 " + status + " 처리되었습니다.", "place-submission", String.valueOf(id));
             if ("승인".equals(status)) {
                 createPlaceFromSubmission(sub);
+                progress.record(userId, "submission-approved", String.valueOf(id));
+            } else {
+                jdbc.update("UPDATE places SET approved=FALSE WHERE source=?", "submission:" + id);
             }
         }
+        if (!body.containsKey("status") && "승인".equals(submission(id).get("status"))) createPlaceFromSubmission(submission(id));
         return Map.of("ok", true, "submission", submission(id));
     }
 
@@ -586,45 +951,25 @@ public class SoomgilApiController {
     }
 
     @PostMapping("/users/{userId}/diaries")
+    @Transactional
     public Map<String, Object> createDiary(@PathVariable String userId, @RequestBody Map<String, Object> body) {
+        var draft=diaryProtection.prepare(userId,null,body);
         long id = insertAndGetId("""
-                INSERT INTO diary_entries(user_id,title,body,place_name,visited_date,weather_icon,page_color,font_family,image_url,drawing_image,drawing_layout,badge_stickers,created_at,updated_at)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """, userId, requireText(body.get("title"), "제목을 입력해주세요."),
-                text(body.get("body")),
-                text(body.get("placeName")),
-                LocalDate.parse(textOr(body.get("visitedDate"), LocalDate.now().toString())),
-                textOr(body.get("weatherIcon"), "sun"),
-                textOr(body.get("pageColor"), "#ffffff"),
-                textOr(body.get("fontFamily"), "Pretendard"),
-                text(body.get("imageUrl")),
-                text(body.get("drawingImage")),
-                textOr(body.get("drawingLayout"), "inline"),
-                textOr(body.get("badgeStickers"), "[]"),
-                LocalDateTime.now(),
-                LocalDateTime.now());
+                INSERT INTO diary_entries(user_id,title,body,place_name,visited_date,weather_icon,page_color,font_family,image_url,drawing_image,drawing_layout,badge_stickers,storage_bytes,created_at,updated_at)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """, userId,draft.title(),draft.body(),draft.placeName(),draft.date(),draft.weather(),draft.color(),draft.font(),draft.image(),draft.drawing(),draft.layout(),draft.stickers(),draft.bytes(),LocalDateTime.now(),LocalDateTime.now());
+        progress.record(userId, "diary", String.valueOf(id));
         return Map.of("ok", true, "diary", diary(id));
     }
 
     @PutMapping("/users/{userId}/diaries/{id}")
+    @Transactional
     public Map<String, Object> updateDiary(@PathVariable String userId, @PathVariable long id, @RequestBody Map<String, Object> body) {
+        var draft=diaryProtection.prepare(userId,id,body);
         jdbc.update("""
-                UPDATE diary_entries SET title=?, body=?, place_name=?, visited_date=?, weather_icon=?, page_color=?, font_family=?, image_url=?, drawing_image=?, drawing_layout=?, badge_stickers=?, updated_at=?
+                UPDATE diary_entries SET title=?, body=?, place_name=?, visited_date=?, weather_icon=?, page_color=?, font_family=?, image_url=?, drawing_image=?, drawing_layout=?, badge_stickers=?, storage_bytes=?, updated_at=?
                 WHERE id=? AND user_id=?
-                """, requireText(body.get("title"), "제목을 입력해주세요."),
-                text(body.get("body")),
-                text(body.get("placeName")),
-                LocalDate.parse(textOr(body.get("visitedDate"), LocalDate.now().toString())),
-                textOr(body.get("weatherIcon"), "sun"),
-                textOr(body.get("pageColor"), "#ffffff"),
-                textOr(body.get("fontFamily"), "Pretendard"),
-                text(body.get("imageUrl")),
-                text(body.get("drawingImage")),
-                textOr(body.get("drawingLayout"), "inline"),
-                textOr(body.get("badgeStickers"), "[]"),
-                LocalDateTime.now(),
-                id,
-                userId);
+                """,draft.title(),draft.body(),draft.placeName(),draft.date(),draft.weather(),draft.color(),draft.font(),draft.image(),draft.drawing(),draft.layout(),draft.stickers(),draft.bytes(),LocalDateTime.now(),id,userId);
         return Map.of("ok", true, "diary", diary(id));
     }
 
@@ -636,22 +981,19 @@ public class SoomgilApiController {
 
     @GetMapping("/suggestions")
     public List<String> suggestions(@RequestParam(defaultValue = "") String q) {
-        String keyword = normalize(q);
-        List<String> base = List.of(
-                "바다", "해변", "해수욕장", "계곡", "캠핑", "글램핑", "차박", "산책길", "둘레길", "숲길",
-                "카페", "감성카페", "맛집", "전망대", "야경", "역사", "전시", "반려동물", "무장애", "아이와 갈만한 곳",
-                "강릉 바다", "제주 오름", "서울 야경", "부산 해수욕장", "경기 계곡", "전국 숨은 장소"
-        );
-        if (keyword.isBlank()) {
-            return base.stream().limit(10).toList();
-        }
-        return base.stream()
-                .filter(item -> normalize(item).contains(keyword) || matchesAlias(item, keyword))
-                .limit(12)
-                .toList();
+        if (q.length() > 100) throw badRequest("검색어는 100자까지 입력할 수 있습니다.");
+        if (q.isBlank()) return List.of();
+        return searchCatalog.suggestions(q, jdbc.queryForList("SELECT DISTINCT name FROM places WHERE approved=TRUE AND tour_visible=TRUE ORDER BY name", String.class));
+    }
+
+    @GetMapping("/suggestions/related")
+    public List<String> relatedSuggestions(@RequestParam(defaultValue = "") String q) {
+        if (q.length() > 100) throw badRequest("검색어는 100자까지 입력할 수 있습니다.");
+        return searchCatalog.related(q);
     }
 
     private void createSchema() {
+        execute("CREATE TABLE IF NOT EXISTS notification_reads (user_id VARCHAR(255) NOT NULL, notification_id BIGINT NOT NULL, PRIMARY KEY(user_id, notification_id))");
         execute("""
                 CREATE TABLE IF NOT EXISTS user_accounts (
                     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -813,7 +1155,33 @@ public class SoomgilApiController {
         ensureColumn("places", "barrier_free_info", "VARCHAR(255)");
         ensureColumn("places", "walking_info", "VARCHAR(255)");
         ensureColumn("places", "camping_info", "VARCHAR(255)");
+        ensureColumn("places", "legal_area_code", "VARCHAR(2)");
+        ensureColumn("places", "legal_district_code", "VARCHAR(5)");
         ensureColumn("user_settings", "notification_enabled", "BOOLEAN");
+        jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_account_provider ON user_accounts(auth_provider,provider_id)");
+        jdbc.execute((org.springframework.jdbc.core.ConnectionCallback<Void>) connection -> {
+            try (var columns = connection.getMetaData().getColumns(connection.getCatalog(), null, "user_accounts", "phone")) {
+                if (columns.next() && columns.getInt("NULLABLE") == java.sql.DatabaseMetaData.columnNoNulls) {
+                    try (var statement = connection.createStatement()) {
+                        statement.execute(connection.getMetaData().getDatabaseProductName().equals("H2")
+                                ? "ALTER TABLE user_accounts ALTER COLUMN phone DROP NOT NULL"
+                                : "ALTER TABLE user_accounts MODIFY COLUMN phone VARCHAR(255) NULL");
+                    }
+                }
+            }
+            return null;
+        });
+        jdbc.execute((org.springframework.jdbc.core.ConnectionCallback<Void>) connection -> {
+            try (var columns = connection.getMetaData().getColumns(connection.getCatalog(), null, "notices", "image_url")) {
+                if (columns.next() && columns.getInt("COLUMN_SIZE") < 2_000_000) {
+                    boolean h2 = connection.getMetaData().getDatabaseProductName().equals("H2");
+                    try (var statement = connection.createStatement()) {
+                        statement.execute(h2 ? "ALTER TABLE notices ALTER COLUMN image_url LONGTEXT" : "ALTER TABLE notices MODIFY COLUMN image_url LONGTEXT");
+                    }
+                }
+            }
+            return null;
+        });
     }
 
     private void seedPlaces() {
@@ -893,18 +1261,26 @@ public class SoomgilApiController {
         return map;
     }
 
+    private boolean published(Map<String, Object> row) { return bool(value(row, "approved")) && !Boolean.FALSE.equals(value(row, "tour_visible")); }
+
     private Map<String, Object> placeMap(Map<String, Object> row) {
+        var content = PlaceContent.classify(row);
         double hiddenScore = parseDouble(value(row, "hidden_score"));
         double hiddenRating = Math.max(0, Math.min(5, hiddenScore / 20.0));
-        String level = textOr(value(row, "level"), crowdLabel(parseDouble(value(row, "concentration"))));
+        var crowd = archivedCrowd.find(text(value(row, "name")), text(value(row, "mapx")), text(value(row, "mapy")), text(value(row, "source")));
+        String level = crowd.map(ArchivedCrowd.Observation::label).orElse("확인 필요");
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("id", number(value(row, "id")));
         map.put("name", text(value(row, "name")));
         map.put("address", text(value(row, "address")));
         map.put("region", text(value(row, "region")).isBlank() ? extractRegion(text(value(row, "address"))) : text(value(row, "region")));
-        map.put("category", text(value(row, "category")));
-        map.put("categoryLabel", text(value(row, "category_label")));
-        map.put("image", textOr(value(row, "image"), "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1000&q=80"));
+        map.put("category", content.category());
+        map.put("categoryLabel", content.label());
+        map.put("contentTypeId", content.type());
+        map.put("contentKind", content.kind());
+        map.put("locationAvailable", PlaceContent.coordinates(row));
+        map.put("image", PlaceContent.displayImage(row));
+        map.put("imageSource", PlaceContent.displayImage(row).isBlank() ? "none" : PlaceContent.officialImage(PlaceContent.displayImage(row)) ? "tourism" : "submission");
         map.put("hiddenScore", Math.round(hiddenScore * 10.0) / 10.0);
         map.put("hiddenRating", Math.round(hiddenRating * 10.0) / 10.0);
         map.put("crowd", level);
@@ -916,7 +1292,44 @@ public class SoomgilApiController {
         map.put("campingInfo", text(value(row, "camping_info")));
         map.put("mapx", text(value(row, "mapx")));
         map.put("mapy", text(value(row, "mapy")));
+        map.put("source", text(value(row, "source")));
+        map.put("legalAreaCode", text(value(row, "legal_area_code")));
+        map.put("legalDistrictCode", text(value(row, "legal_district_code")));
+        map.put("imageVerified", PlaceContent.officialImage(PlaceContent.displayImage(row)));
+        map.put("ratingVerified", false);
+        map.put("crowdVerified", false);
+        map.put("crowdAvailable", crowd.isPresent());
+        map.put("crowdBasis", crowd.isPresent() ? "archived" : "unknown");
+        map.put("crowdSource", crowd.isPresent() ? "legacy-db" : "");
+        map.put("crowdValue", crowd.map(ArchivedCrowd.Observation::value).orElse(null));
+        map.put("crowdBackupAt", crowd.map(ArchivedCrowd.Observation::backupAt).orElse(null));
+        map.put("crowdCollectedAt", null);
+        map.put("petInfo", "동반 가능 여부 확인 필요");
+        map.put("barrierFreeInfo", "접근성 정보 확인 필요");
+        crowdForecast.apply(map);
+        if (content.kind().equals("course")) {
+            map.put("crowdAvailable",false); map.put("crowdVerified",false); map.put("crowdBasis","unknown"); map.put("crowdValue",null); map.put("crowdStatus","unsupported");
+        }
         return map;
+    }
+
+    private void restoreCatalog() {
+        try (var input = getClass().getResourceAsStream("/data/recovered-places.json")) {
+            if (input == null) return;
+            List<Map<String, String>> records = mapper.readValue(input, new TypeReference<>() {});
+            for (var item : records) {
+                String category = item.get("category");
+                String label = switch (category) { case "food" -> "음식점"; case "cafe" -> "카페"; case "camping" -> "캠핑"; default -> "관광지"; };
+                List<Map<String, Object>> existing = jdbc.queryForList("SELECT id, source FROM places WHERE name=?", item.get("name"));
+                if (existing.isEmpty()) {
+                    jdbc.update("INSERT INTO places(name,address,region,category,category_label,image,mapx,mapy,approved,source,tags) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                            item.get("name"), item.get("address"), extractRegion(item.get("address")), category, label, item.get("image"), item.get("mapx"), item.get("mapy"), true, "recovered-tour-api", item.get("name"));
+                } else if ("rebuild-seed".equals(text(value(existing.get(0), "source")))) {
+                    jdbc.update("UPDATE places SET address=?,region=?,category=?,category_label=?,image=?,mapx=?,mapy=?,source=? WHERE id=?",
+                            item.get("address"), extractRegion(item.get("address")), category, label, item.get("image"), item.get("mapx"), item.get("mapy"), "recovered-tour-api", value(existing.get(0), "id"));
+                }
+            }
+        } catch (java.io.IOException exception) { throw new IllegalStateException("Public place catalog could not be read", exception); }
     }
 
     private Map<String, Object> reviewMap(Map<String, Object> row) {
@@ -925,7 +1338,8 @@ public class SoomgilApiController {
                 "placeId", number(value(row, "place_id")),
                 "text", text(value(row, "text")),
                 "userId", "익명",
-                "ownerId", text(value(row, "user_id")),
+                "mine", auth.currentUser().equals(text(value(row, "user_id"))),
+                "liked", readStringList(text(value(row, "liked_by_json"))).contains(auth.currentUser()),
                 "createdAt", text(value(row, "created_at")),
                 "likeCount", number(value(row, "like_count"))
         );
@@ -942,6 +1356,12 @@ public class SoomgilApiController {
                 "createdAt", text(value(row, "created_at")),
                 "updatedAt", text(value(row, "updated_at"))
         );
+    }
+
+    private void validateNotice(Map<String, Object> body) {
+        if (text(body.get("title")).length() > 300 || text(body.get("body")).length() > 4000) throw badRequest("공지 제목은 300자, 본문은 4,000자까지 입력할 수 있습니다.");
+        validateImage(text(body.get("imageUrl")));
+        if (!List.of("normal", "large").contains(textOr(body.get("bodySize"), "normal")) || !List.of("normal", "bold").contains(textOr(body.get("bodyWeight"), "normal"))) throw badRequest("글자 서식을 확인해주세요.");
     }
 
     private Map<String, Object> notificationMap(Map<String, Object> row) {
@@ -1017,6 +1437,7 @@ public class SoomgilApiController {
         map.put("profileBorder", textOr(value(row, "profile_border"), "#6d5dfc"));
         map.put("displayBadgeIds", readStringList(text(value(row, "display_badge_ids_json"))));
         map.put("interests", readStringList(text(value(row, "interests_json"))));
+        map.putAll(preferences.read(userId));
         map.put("darkMode", bool(value(row, "dark_mode")));
         map.put("notificationEnabled", !Objects.equals(value(row, "notification_enabled"), Boolean.FALSE));
         map.put("address", Map.of(
@@ -1025,6 +1446,13 @@ public class SoomgilApiController {
                 "eupmyeondong", text(value(row, "address_eupmyeondong"))
         ));
         map.put("stats", userStats(userId));
+        map.put("role", auth.isAdmin() ? "ADMIN" : "USER");
+        map.put("progress", progress.summary(userId));
+        findAccount(userId).ifPresent(account -> {
+            map.put("emailVerified", bool(value(account, "email_verified")));
+            map.put("phoneVerified", bool(value(account, "phone_verified")));
+            map.put("authProvider", text(value(account, "auth_provider")));
+        });
         return map;
     }
 
@@ -1036,48 +1464,24 @@ public class SoomgilApiController {
             person.put("nickname", textOr(value(row, "nickname"), text(value(row, "user_id"))));
             person.put("profileImage", textOr(value(row, "profile_image"), "👤"));
             person.put("profileBorder", textOr(value(row, "profile_border"), "#6d5dfc"));
+            person.put("following", count("SELECT COUNT(*) FROM follows WHERE follower_id=? AND following_id=?", auth.currentUser(), text(value(row, "user_id"))) > 0);
             return person;
         }).toList();
     }
 
-    private List<Map<String, Object>> nearbyHiddenPlaces(long currentId) {
-        Map<String, Object> current = placeMap(findPlaceRow(currentId).orElse(Map.of()));
-        String region = text(current.get("region"));
-        return places("", region, "", "hidden").stream()
-                .filter(place -> number(place.get("id")) != currentId)
-                .limit(2)
-                .toList();
-    }
-
-    private List<Map<String, Object>> halfDayCourse(Map<String, Object> place) {
-        String region = text(place.get("region"));
+    private List<Map<String, Object>> halfDayCourse(Map<String, Object> place, List<Map<String,Object>> nearbyPlaces) {
         List<Map<String, Object>> course = new ArrayList<>();
-        course.add(Map.of("step", "오전", "title", text(place.get("name")), "description", region + "의 대표 포인트를 먼저 둘러봅니다."));
-        course.add(Map.of("step", "점심", "title", "근처 식사/카페", "description", "혼잡도가 낮은 주변 식당이나 카페를 짧게 연결합니다."));
-        course.add(Map.of("step", "오후", "title", "숨은 산책 코스", "description", "방문객이 몰리는 시간을 피해 가까운 산책길로 마무리합니다."));
+        course.add(Map.of("step", "01", "title", text(place.get("name")), "description", "선택한 장소에서 출발", "placeId", place.get("id")));
+        for (var nearby : nearbyPlaces) {
+            course.add(Map.of("step", "0" + (course.size() + 1), "title", nearby.get("name"), "description", "출발지에서 직선거리 " + nearby.get("distanceKm") + "km · " + nearby.get("categoryLabel"), "placeId", nearby.get("id")));
+        }
         return course;
-    }
-
-    private String recommendationReason(Map<String, Object> place) {
-        String region = text(place.get("region"));
-        String crowd = text(place.get("crowd"));
-        String category = textOr(place.get("categoryLabel"), "장소");
-        String tags = text(place.get("tags")).replace(",", ", ");
-        if ("한적함".equals(crowd)) {
-            return region + "에서 비교적 한적하게 즐길 수 있는 " + category + "입니다. " + tags + " 흐름이 있어 짧은 여행 코스로 묶기 좋습니다.";
-        }
-        if ("붐빔".equals(crowd)) {
-            return region + "의 인기 " + category + "라 방문 시간대를 조절하는 편이 좋습니다. 대신 주변 편의시설과 연계성이 좋습니다.";
-        }
-        return region + "에서 접근성과 분위기의 균형이 좋은 " + category + "입니다. 혼잡도와 장소 특성을 함께 보면 반나절 코스에 적합합니다.";
     }
 
     private Comparator<Map<String, Object>> placeComparator(String sort) {
         return switch (sort) {
-            case "hidden" -> Comparator.comparingDouble((Map<String, Object> p) -> parseDouble(p.get("hiddenScore"))).reversed();
             case "name" -> Comparator.comparing(p -> text(p.get("name")));
-            case "crowd" -> Comparator.comparing(p -> text(p.get("crowd")));
-            default -> Comparator.comparingDouble((Map<String, Object> p) -> parseDouble(p.get("hiddenScore"))).reversed();
+            default -> Comparator.<Map<String, Object>>comparingInt(p -> Boolean.TRUE.equals(p.get("imageVerified")) ? 0 : 1).thenComparing(p -> text(p.get("name")));
         };
     }
 
@@ -1090,29 +1494,33 @@ public class SoomgilApiController {
                 text(place.get("address")),
                 text(place.get("region")),
                 text(place.get("categoryLabel")),
-                text(place.get("tags")),
-                text(place.get("petInfo")),
-                text(place.get("barrierFreeInfo"))
+                text(place.get("tags"))
         ));
-        return merged.contains(q) || matchesAlias(merged, q);
+        return searchCatalog.matches(merged, q);
     }
 
-    private boolean matchesAlias(String text, String q) {
-        Map<String, List<String>> aliases = Map.of(
-                "바다", List.of("해변", "해수욕장", "해안", "노을"),
-                "해변", List.of("바다", "해수욕장", "해안"),
-                "산책", List.of("둘레길", "숲길", "산책길", "트레킹"),
-                "캠핑", List.of("야영장", "글램핑", "차박", "고캠핑"),
-                "계곡", List.of("폭포", "물놀이", "숲"),
-                "무장애", List.of("장애인", "휠체어", "배리어프리"),
-                "반려동물", List.of("강아지", "애견", "펫", "동반")
-        );
-        return aliases.getOrDefault(q, List.of()).stream().anyMatch(alias -> normalize(text).contains(normalize(alias)));
+    private boolean validCoordinates(Map<String, Object> place) {
+        double x = parseDouble(place.get("mapx")), y = parseDouble(place.get("mapy"));
+        return x > 124 && x < 132 && y > 32 && y < 39;
+    }
+
+    private double distanceKm(Map<String, Object> a, Map<String, Object> b) {
+        double lat1 = Math.toRadians(parseDouble(a.get("mapy"))), lat2 = Math.toRadians(parseDouble(b.get("mapy")));
+        double lat = lat2 - lat1, lon = Math.toRadians(parseDouble(b.get("mapx")) - parseDouble(a.get("mapx")));
+        double h = Math.pow(Math.sin(lat / 2), 2) + Math.cos(lat1) * Math.cos(lat2) * Math.pow(Math.sin(lon / 2), 2);
+        return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
     }
 
     private void createPlaceFromSubmission(Map<String, Object> sub) {
         String name = text(sub.get("name"));
         String address = text(sub.get("address"));
+        String source = "submission:" + sub.get("id");
+        if (count("SELECT COUNT(*) FROM places WHERE source=?", source) > 0) {
+            jdbc.update("UPDATE places SET name=?,address=?,region=?,category=?,category_label=?,tags=?,approved=TRUE WHERE source=?",
+                    name, address, text(sub.get("region")), textOr(sub.get("category"), "tour"), textOr(sub.get("categoryLabel"), "관광지"), text(sub.get("description")), source);
+            placeQueries.indexSource(source);
+            return;
+        }
         if (count("SELECT COUNT(*) FROM places WHERE name=? AND address=?", name, address) > 0) {
             return;
         }
@@ -1121,7 +1529,8 @@ public class SoomgilApiController {
                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
                 """, name, address, text(sub.get("region")), textOr(sub.get("category"), "tour"),
                 textOr(sub.get("categoryLabel"), "관광지"), "70", "확인 필요", "확인 필요", "",
-                textOr(sub.get("description"), "사용자 제보"), true, "submission");
+                textOr(sub.get("description"), "사용자 제보"), true, source);
+        placeQueries.indexSource(source);
     }
 
     private void saveSearchLog(String userId, String keyword) {
@@ -1131,7 +1540,7 @@ public class SoomgilApiController {
     }
 
     private void ensurePlace(long id) {
-        if (count("SELECT COUNT(*) FROM places WHERE id=?", id) == 0) {
+        if (count("SELECT COUNT(*) FROM places WHERE id=? AND approved=TRUE AND tour_visible=TRUE", id) == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "장소를 찾을 수 없습니다.");
         }
     }
@@ -1169,7 +1578,7 @@ public class SoomgilApiController {
         jdbc.update("""
                 UPDATE user_settings SET username=?, full_name=?, nickname=?, email=?, phone=?, email_verified=?, phone_verified=?, privacy_consent=?, logged_in=?, notification_enabled=?
                 WHERE user_id=?
-                """, userId, fullName, userId, email, phone, true, !phone.isBlank(), true, true, true, userId);
+                """, userId, fullName, userId, email, phone, false, false, true, true, true, userId);
     }
 
     private void ensureUserSetting(String userId) {
@@ -1189,9 +1598,7 @@ public class SoomgilApiController {
     }
 
     private void requireAdmin(String code) {
-        if (!Objects.equals(adminCode, code)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "관리자 코드가 올바르지 않습니다.");
-        }
+        if (!auth.isAdmin()) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "관리자 계정으로 로그인해주세요.");
     }
 
     private ResponseStatusException badRequest(String message) {
@@ -1216,18 +1623,13 @@ public class SoomgilApiController {
     }
 
     private String hashPassword(String password) {
-        try {
-            byte[] salt = new byte[16];
-            secureRandom.nextBytes(salt);
-            byte[] hash = pbkdf2(password.toCharArray(), salt, 120000);
-            return "pbkdf2$120000$" + Base64.getEncoder().encodeToString(salt) + "$" + Base64.getEncoder().encodeToString(hash);
-        } catch (Exception exception) {
-            throw new IllegalStateException("Password hashing failed", exception);
-        }
+        if (password.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72) throw badRequest("비밀번호는 UTF-8 기준 72바이트까지 사용할 수 있습니다.");
+        return passwordEncoder.encode(password);
     }
 
     private boolean verifyPassword(String password, String stored) {
         try {
+            if (stored.startsWith("$2")) return passwordEncoder.matches(password, stored);
             if (stored.startsWith("oauth$")) {
                 return false;
             }
@@ -1291,19 +1693,16 @@ public class SoomgilApiController {
     }
 
     private void execute(String sql) {
-        try {
-            jdbc.execute(sql);
-        } catch (Exception ignored) {
-            // Existing restored MariaDB schemas may already have stricter column definitions.
-        }
+        jdbc.execute(sql);
     }
 
     private void ensureColumn(String table, String column, String type) {
-        try {
-            jdbc.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + type);
-        } catch (Exception ignored) {
-            // Column already exists or the database refused a duplicate add.
-        }
+        boolean exists = Boolean.TRUE.equals(jdbc.execute((org.springframework.jdbc.core.ConnectionCallback<Boolean>) connection -> {
+            try (var result = connection.getMetaData().getColumns(connection.getCatalog(), null, table, column)) {
+                return result.next();
+            }
+        }));
+        if (!exists) jdbc.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + type);
     }
 
     private Object value(Map<String, Object> row, String key) {
@@ -1369,8 +1768,23 @@ public class SoomgilApiController {
     }
 
     private String defaultUser(Object userId) {
-        String text = text(userId);
-        return text.isBlank() ? "guest" : text;
+        return auth.requireUser();
+    }
+
+    private void requireOwned(String table, long id, String userId) {
+        if (count("SELECT COUNT(*) FROM " + table + " WHERE id=? AND user_id=?", id, userId) == 0)
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "항목을 찾을 수 없습니다.");
+    }
+
+    private void validateImage(String image) {
+        if (image.length() > 2_000_000) throw badRequest("사진 용량이 너무 큽니다. 작은 사진을 선택해주세요.");
+        if (image.startsWith("data:") && !image.matches("^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$")) throw badRequest("JPG, PNG, WebP 사진을 선택해주세요.");
+        if (image.length() > 20 && !image.startsWith("https://") && !image.startsWith("data:image/")) throw badRequest("사진 형식을 확인해주세요.");
+    }
+
+    private void validateInquiry(Map<String, Object> body) {
+        DiaryProtection.field(body,"title","",150);
+        DiaryProtection.field(body,"body","",4000);
     }
 
     private String toCamel(String snake) {
@@ -1397,13 +1811,4 @@ public class SoomgilApiController {
         return first.replace("특별자치도", "도").replace("광역시", "").replace("특별시", "");
     }
 
-    private String crowdLabel(double concentration) {
-        if (concentration >= 75) {
-            return "붐빔";
-        }
-        if (concentration >= 35) {
-            return "보통";
-        }
-        return "한적함";
-    }
 }

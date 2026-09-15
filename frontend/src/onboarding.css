@@ -1,0 +1,72 @@
+.welcome-page { min-height: 100dvh; display: flex; flex-direction: column; }
+.welcome-scene { position: relative; height: min(62dvh, 590px); min-height: 300px; background: #22655f; color: white; overflow: hidden; }
+.welcome-scene > img { width: 100%; height: 100%; object-fit: cover; }
+.welcome-shade { position: absolute; inset: 0; background: linear-gradient(180deg, #102e2b55, transparent 35%, #102e2bbd); }
+.welcome-brand { position: absolute; top: 28px; left: 24px; display: flex; align-items: center; gap: 10px; }
+.welcome-brand h1 { font-size: 34px; font-weight: 800; }
+.welcome-brand .brand-mark { background: #e7fff6; color: #1a625b; }
+.welcome-copy { position: absolute; left: 24px; right: 24px; bottom: 60px; }
+.welcome-copy p { font-size: 15px; margin-bottom: 10px; }
+.welcome-copy h2 { font-size: 26px; line-height: 1.5; }
+.welcome-location { position: absolute; bottom: 18px; left: 24px; font-size: 11px; opacity: .9; }
+.welcome-actions { display: grid; gap: 10px; padding: 25px 24px max(22px, env(safe-area-inset-bottom)); }
+.welcome-actions .primary-button, .welcome-actions .secondary-button { min-height: 49px; }
+.welcome-browse { min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 7px; color: var(--muted); font-size: 14px; }
+.signup-art { align-self: center; width: 112px; height: 112px; object-fit: contain; margin: 0 auto 32px; }
+.signup-methods { display: grid; gap: 12px; }
+.signup-methods .or-divider { margin: 5px 0; }
+.naver-login { display: grid; gap: 8px; }
+.naver-button { display: flex; align-items: center; justify-content: center; gap: 14px; min-height: 48px; padding: 10px 16px; border-radius: 8px; background: #03c75a; color: #fff; font-size: 16px; font-weight: 600; }
+.naver-button > span { font-family: Arial, sans-serif; font-weight: 900; font-size: 23px; }
+.naver-login small { font-size: 12px; color: var(--muted); }
+.naver-profile-preview { width: 76px; height: 76px; object-fit: cover; border-radius: 50%; margin: 0 auto 8px; }
+.google-login { justify-items: stretch; min-width: 0; }
+.google-login > div { min-width: 0; width: 100%; }
+.login-prompt-actions { display: grid; gap: 9px; margin-top: 22px; }
+.login-prompt-actions > .text-button { min-height: 40px; color: var(--muted); }
+.onboarding-page { min-height: 100dvh; display: flex; flex-direction: column; }
+.onboarding-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 16px 15px; gap: 10px; }
+.onboarding-header .brand { font-size: 20px; }
+.onboarding-counter { width: 40px; text-align: center; color: var(--muted); font-size: 12px; }
+.onboarding-progress { width: calc(100% - 48px); margin: 0 24px; flex-shrink: 0; height: 4px; }
+.onboarding-body { flex: 1; padding: 32px 24px 24px; }
+.onboarding-body h1 { font-size: 28px; line-height: 1.45; }
+.onboarding-eyebrow { font-size: 13px; color: var(--accent); margin-bottom: 9px; font-weight: 600; }
+.onboarding-interests { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 28px; }
+.onboarding-interests > button { position: relative; min-width: 0; min-height: 102px; padding: 12px 4px; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font-size: 13px; }
+.onboarding-interests img { width: 44px; height: 44px; object-fit: contain; }
+.onboarding-interests [aria-pressed="true"], .onboarding-regions [aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.choice-check { position: absolute; right: 6px; top: 6px; }
+.onboarding-crowd { display: grid; gap: 12px; margin-top: 30px; }
+.onboarding-crowd > label { display: flex; align-items: center; gap: 12px; padding: 20px 14px; min-height: 102px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.onboarding-crowd > label.is-selected { border-color: var(--accent); background: var(--accent-soft); }
+.onboarding-crowd > label > svg { color: var(--accent); }
+.onboarding-crowd > label > span { flex: 1; min-width: 0; display: grid; gap: 5px; }
+.onboarding-crowd strong { font-size: 14px; }
+.onboarding-crowd small { font-size: 12px; }
+.onboarding-crowd input { width: 17px; height: 17px; flex-shrink: 0; accent-color: var(--accent); }
+.onboarding-regions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 30px; }
+.onboarding-regions button { min-height: 48px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; display: flex; justify-content: center; align-items: center; gap: 5px; }
+.onboarding-footer { position: sticky; bottom: 0; background: var(--bg); padding: 16px 24px max(22px, env(safe-area-inset-bottom)); display: grid; gap: 10px; border-top: 1px solid var(--line); }
+.onboarding-footer .primary-button { min-height: 49px; }
+.onboarding-skip { min-height: 35px; color: var(--muted); font-size: 13px; }
+.onboarding-complete { text-align: center; padding-top: 18px; }
+.onboarding-complete > p:last-of-type { font-size: 14px; color: var(--muted); margin-top: 14px; }
+.departure-stage { position: relative; overflow: hidden; width: 100%; height: 172px; display: grid; place-items: center; }
+.departure-plane { color: var(--accent); fill: var(--accent-soft); position: relative; z-index: 1; transform: rotate(15deg); }
+.flight-trail { position: absolute; width: 37%; left: 0; top: 56%; border-top: 2px dashed var(--line); }
+.preference-receipt { display: flex; justify-content: center; gap: 20px; margin-top: 28px; font-size: 13px; color: var(--muted); }
+.preference-receipt strong { display: block; color: var(--text); margin-top: 4px; }
+.is-departing .departure-plane { animation: departure-flight 1.2s ease-in-out both; }
+.is-departing .onboarding-body { animation: departure-fade 1.2s ease both; }
+@keyframes departure-flight { 0% { transform: translateX(-105px) rotate(15deg); } 30% { transform: translateX(0) rotate(15deg); } 100% { transform: translateX(260px) translateY(-35px) rotate(15deg); } }
+@keyframes departure-fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+@media (max-width: 350px) {
+  .onboarding-body { padding: 24px 18px; }
+  .onboarding-body h1 { font-size: 26px; }
+  .onboarding-interests { gap: 7px; }
+  .onboarding-crowd > label { gap: 8px; padding: 16px 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-departing .departure-plane, .is-departing .onboarding-body { animation: none; }
+}

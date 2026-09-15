@@ -1,0 +1,10 @@
+# Planning template, NOT automatically loaded. Dedicated-host deployment only.
+# Confirm school ownership of ports 80/443 before using this origin.
+SOOMGIL_PUBLIC_ORIGIN=https://jiri.hknu.ac.kr
+NAVER_REDIRECT_URI=https://jiri.hknu.ac.kr/api/auth/naver/callback
+PORT=8080
+SOOMGIL_DEMO_USERS=false
+SOOMGIL_BACKUP_ENABLED=true
+# Set the real administrator and secrets privately on the server.
+# Caddy reads this from its service environment, not the backend .env:
+SOOMGIL_DOMAIN=jiri.hknu.ac.kr

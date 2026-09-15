@@ -1,0 +1,14 @@
+<service>
+  <id>SoomgilMonitor</id>
+  <name>Soomgil Monitor</name>
+  <description>Checks local API and database backups; optional HTTPS alert webhook.</description>
+  <executable>powershell.exe</executable>
+  <arguments>-NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "%BASE%\..\..\scripts\watch-service.ps1" -BackupDirectory "%BASE%\..\..\backup\database"</arguments>
+  <workingdirectory>%BASE%\..\..</workingdirectory>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <serviceaccount><username>NT AUTHORITY\LocalService</username></serviceaccount>
+  <onfailure action="restart" delay="30 sec" />
+  <logpath>%BASE%\..\..\runtime\logs</logpath>
+  <log mode="roll-by-size"><sizeThreshold>1024</sizeThreshold><keepFiles>5</keepFiles></log>
+</service>

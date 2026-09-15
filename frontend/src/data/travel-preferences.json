@@ -1,0 +1,19 @@
+[
+  { "id": "sea", "label": "바다", "art": "tour", "onboarding": true },
+  { "id": "cafe", "label": "카페", "art": "cafe", "onboarding": true },
+  { "id": "nature", "label": "자연", "art": "nature", "onboarding": true },
+  { "id": "camping", "label": "캠핑", "art": "camping", "onboarding": true },
+  { "id": "culture", "label": "문화·예술", "art": "culture", "onboarding": true },
+  { "id": "food", "label": "맛집", "art": "food", "onboarding": true },
+  { "id": "walk", "label": "산책", "art": "walk", "onboarding": true },
+  { "id": "experience", "label": "체험", "art": "experience", "onboarding": true },
+  { "id": "tour", "label": "관광지", "art": "all", "onboarding": true },
+  { "id": "mountain", "label": "산", "art": "nature" },
+  { "id": "park", "label": "공원", "art": "walk" },
+  { "id": "photo", "label": "사진", "art": "photo" },
+  { "id": "history", "label": "역사", "art": "culture" },
+  { "id": "museum", "label": "박물관", "art": "culture" },
+  { "id": "family", "label": "가족", "art": "all" },
+  { "id": "field-trip", "label": "현장체험학습", "art": "experience" },
+  { "id": "quiet", "label": "조용한 장소", "art": "nature" }
+]

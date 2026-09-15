@@ -1,0 +1,56 @@
+{
+  "source": "legacy-db",
+  "backupAt": "2026-09-09T19:50:04",
+  "records": [
+    {
+      "name": "순포해변",
+      "address": "강원특별자치도 강릉시 사천면 해안로 722",
+      "mapx": "128.8902985428",
+      "mapy": "37.8193190673",
+      "source": "tour-api",
+      "concentration": 17.93,
+      "level": "한적함",
+      "collectedAt": null
+    },
+    {
+      "name": "뒷뜨루관광농원",
+      "address": "강원특별자치도 강릉시 사천면 청솔공원길 108",
+      "mapx": "128.8370445153",
+      "mapy": "37.8353717256",
+      "source": null,
+      "concentration": 11.94,
+      "level": "한적함",
+      "collectedAt": null
+    },
+    {
+      "name": "소돌해수욕장",
+      "address": "강원특별자치도 강릉시 주문진읍 해안로 1993",
+      "mapx": "128.8272654209",
+      "mapy": "37.9062383246",
+      "source": "tour-api",
+      "concentration": 28.01,
+      "level": "한적함",
+      "collectedAt": null
+    },
+    {
+      "name": "오대산 소금강계곡",
+      "address": "강원특별자치도 강릉시 연곡면 삼산리",
+      "mapx": "128.6576247467",
+      "mapy": "37.8306548995",
+      "source": "tour-api",
+      "concentration": 16.4,
+      "level": "한적함",
+      "collectedAt": null
+    },
+    {
+      "name": "묵호등대",
+      "address": "강원특별자치도 동해시 해맞이길 289 (묵호진동)",
+      "mapx": "129.1184741143",
+      "mapy": "37.5548307473",
+      "source": "tour-api",
+      "concentration": 23.27,
+      "level": "한적함",
+      "collectedAt": null
+    }
+  ]
+}

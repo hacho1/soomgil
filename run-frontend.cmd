@@ -1,4 +1,5 @@
 @echo off
 cd /d "%~dp0frontend"
-npm.cmd install
-npm.cmd run dev
+call npm.cmd ci
+if errorlevel 1 exit /b %errorlevel%
+call npm.cmd run dev
