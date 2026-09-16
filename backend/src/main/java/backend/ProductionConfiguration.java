@@ -23,6 +23,7 @@ public class ProductionConfiguration {
         if (env.getProperty("soomgil.demo-users", Boolean.class, false)) throw new IllegalStateException("Disable SOOMGIL_DEMO_USERS before production");
         if (!"127.0.0.1".equals(env.getProperty("server.address"))) throw new IllegalStateException("Production backend must bind to loopback behind the local HTTPS proxy");
         if (env.getProperty("soomgil.admin.username", "").isBlank()) throw new IllegalStateException("Set a production administrator account");
+        if (SessionAuth.demoUsername(env.getProperty("soomgil.admin.username"))) throw new IllegalStateException("Use a private administrator account, not a demo username");
         if (env.getProperty("server.port", Integer.class, 8080) != 8080)
             throw new IllegalStateException("The bundled HTTPS proxy requires backend port 8080");
         String naverId = env.getProperty("soomgil.naver.client-id", "").trim();

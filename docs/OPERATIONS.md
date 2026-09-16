@@ -86,8 +86,8 @@ Windows PowerShell에서 스크립트 실행 정책 오류가 나면 관리자 �
 1. 운영 프로젝트는 고정된 로컬 디스크에 두고 테스트 계정/임시 비밀번호를 제거하거나 변경합니다. `SOOMGIL_DEMO_USERS=false`만으로 이미 만들어진 테스트 계정이 삭제되지는 않습니다. 관리자 계정과 Gmail 실제 수신, OAuth 운영 도메인 등록, 노출된 비밀키 재발급을 완료합니다.
 2. `frontend`에서 `npm ci`, `npm run build`, `backend`에서 `gradlew.bat test bootJar`를 실행합니다. Vite 개발 서버를 공개하지 않습니다.
 3. 비공개 `.env`에 `SOOMGIL_PUBLIC_ORIGIN=https://실제도메인`, `SOOMGIL_ADMIN_USERNAME=실제관리자아이디`, `SOOMGIL_DEMO_USERS=false`를 지정합니다. production 프로필은 HTTPS 출처, 단일 CORS, Secure 쿠키, 루프백 바인딩, 관리자 지정이 빠지면 시작을 거부합니다.
-4. 공식 Caddy Windows 바이너리를 `deploy/windows/caddy.exe`에 준비합니다. 공식 WinSW 배포판을 각 XML과 이름이 같게 `soomgil-backend.exe`, `soomgil-web.exe`, `soomgil-monitor.exe`로 준비합니다. 신뢰하는 버전을 고정하고 배포 해시를 확인합니다. 실행 파일은 Git에 넣지 않습니다.
-5. 서비스 환경에 `JAVA_HOME`, `SOOMGIL_DOMAIN`(호스트명만)을 지정합니다. Web 서비스 XML은 `SOOMGIL_WEB_ROOT`를 `frontend/dist`로 지정합니다. Caddy는 `.env`를 읽지 않습니다. **프로젝트 루트나 DB 폴더를 웹 루트로 지정하면 안 됩니다.**
+4. `scripts/prepare-windows-tools.ps1`과 `scripts/package-deployment.ps1`로 배포 묶음을 준비할 수 있습니다. 공식 Caddy는 `deploy/windows/caddy.exe`, WinSW는 각 XML과 같은 이름으로 준비됩니다. Java 17 JDK는 `runtime/java`, Node는 `runtime/node`에 있습니다. 실행 파일은 Git에 넣지 않습니다. [운반/설치 순서](JIRI_HANDOFF.md)
+5. 현재 백엔드 서비스 XML은 동봉된 `runtime/java/bin/java.exe`를 사용합니다. Web XML은 `SOOMGIL_DOMAIN=jiri.hknu.ac.kr`과 `SOOMGIL_WEB_ROOT=frontend/dist`를 지정합니다. 다른 서버에 재사용할 때는 명시적으로 변경합니다. Caddy는 `.env`를 읽지 않습니다. **프로젝트 루트나 DB 폴더를 웹 루트로 지정하면 안 됩니다.**
 6. 기본 서비스 계정은 `NT AUTHORITY\LocalService`입니다. 프로젝트 실행 파일에는 읽기/실행만, `backend/data`, `backup`, `runtime`, Caddy 인증서 저장소에는 필요한 수정 권한만 부여합니다. `.env`는 백엔드 운영 계정/관리자에게만 허용합니다. 더 강한 분리가 필요하면 개별 비관리자 서비스 계정으로 교체합니다. 관리자/Everyone 전체 권한으로 우회하지 마세요.
 7. Caddy 설정을 `caddy.exe validate --config ../Caddyfile --adapter caddyfile`로 검사합니다. 실제 도메인 DNS를 서버로 연결하고 웹 접속용 80/443만 허용합니다. 8080/5173/DB 포트는 공개하지 않습니다. production 백엔드는 127.0.0.1:8080에만 바인딩합니다.
 8. 관리자 터미널의 `deploy/windows`에서 각 `soomgil-*.exe install`, `soomgil-*.exe start`로 설치·실행합니다. 서비스 설치/방화벽 변경은 배포 시 직접 승인해서 진행합니다. 기존 개발 백엔드와 동시에 같은 DB를 열지 않습니다.
@@ -98,9 +98,9 @@ production은 로컬 Caddy의 전달 헤더만 신뢰합니다. 프록시를 다
 
 ## 아직 필요한 운영 결정
 
-- 지리산 서버의 전용/공유 여부, 실제 HTTPS 경로·서버 권한, 외부 장애 알림 수신처
+- 지리산 서버는 2026-09-16 사용자 확인으로 숨길 전용입니다. 실제 HTTPS·서버 권한, 외부 장애 알림 수신처는 미검증입니다.
 - 암호화된 외부 백업 저장소, Gmail 실제 수신 및 비밀키 교체
-- GitHub 원격 저장소: 현재 미등록. C/D 소스 백업은 클라우드 백업이 아닙니다.
+- GitHub 원격 저장소: `https://github.com/hacho1/soomgil` 비공개 저장소. 마지막 푸시 이후 로컬 변경은 별도 커밋/푸시가 필요하며 실제 DB와 비밀 설정은 포함하지 않습니다.
 - 실제 운영 DB를 이용한 백업 확인, 별도 환경 전체 복원 훈련, 장애/재부팅/HTTPS 시험
 
 ## 근거 문서

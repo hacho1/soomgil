@@ -36,3 +36,14 @@ test("wrong API, redirects/failures and a public development frontend fail", asy
   assert.equal(failed.automatedChecksPassed, false);
   assert.ok(!JSON.stringify(failed).includes("secret transport details"));
 });
+
+test("an unreachable health endpoint stops before repeated connection timeouts", async () => {
+  let calls = 0;
+  const report = await checkRelease("http://127.0.0.1:18787", { fetcher: () => { calls++; throw new Error("private transport details"); } });
+  assert.equal(calls, 1);
+  assert.equal(report.automatedChecksPassed, false);
+  assert.equal(report.launchApproved, false);
+  assert.equal(report.checks.length, 2);
+  assert.ok(report.remaining[0].includes("other checks were not attempted"));
+  assert.ok(!JSON.stringify(report).includes("private transport details"));
+});

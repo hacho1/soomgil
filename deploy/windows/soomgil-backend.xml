@@ -2,7 +2,7 @@
   <id>SoomgilBackend</id>
   <name>Soomgil Backend</name>
   <description>Soomgil production API. Loopback only; Caddy handles HTTPS.</description>
-  <executable>%JAVA_HOME%\bin\java.exe</executable>
+  <executable>%BASE%\..\..\runtime\java\bin\java.exe</executable>
   <arguments>-jar "%BASE%\..\..\backend\build\libs\backend-0.0.1-SNAPSHOT.jar" --spring.profiles.active=production</arguments>
   <workingdirectory>%BASE%\..\..\backend</workingdirectory>
   <startmode>Automatic</startmode>

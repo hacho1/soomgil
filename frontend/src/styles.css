@@ -181,10 +181,20 @@ progress::-webkit-progress-value { background: var(--accent); border-radius: 6px
 .category-intro { padding-bottom: 25px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
 .category-intro h2 { font-size: 22px; margin: 5px 0 10px; }
 .category-intro a { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
-.subcategory-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 25px 10px; }
-.subcategory-grid a { display: grid; justify-items: center; gap: 9px; min-width: 0; text-align: center; }
-.subcategory-icon { display: grid; place-items: center; width: 49px; height: 49px; border-radius: 16px; }
-.subcategory-grid strong { font-size: 12px; font-weight: 550; word-break: keep-all; overflow-wrap: anywhere; }
+.subcategory-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px 10px; }
+.subcategory-grid a { display: grid; justify-items: center; align-content: start; gap: 9px; min-width: 0; text-align: center; }
+.subcategory-icon { position: relative; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; }
+.subcategory-tone-sky { --tone: #326f9f; --tone-bg: #edf5fd; }
+.subcategory-tone-green { --tone: #39785c; --tone-bg: #edf6ef; }
+.subcategory-tone-gold { --tone: #966b20; --tone-bg: #fff6df; }
+.subcategory-tone-clay { --tone: #a26843; --tone-bg: #fcf0e8; }
+.subcategory-tone-rose { --tone: #b35e77; --tone-bg: #fceef2; }
+.subcategory-tone-violet { --tone: #8064aa; --tone-bg: #f3effa; }
+.subcategory-icon.has-detail .subcategory-symbol { transform: translate(-4px, -4px); }
+.subcategory-detail { position: absolute; right: 1px; bottom: 1px; display: grid; place-items: center; width: 24px; height: 24px; border: 2px solid var(--tone-bg); border-radius: 50%; background: var(--tone-bg); }
+.theme-dark .subcategory-detail { background: var(--soft); border-color: var(--soft); }
+.subcategory-grid strong { font-size: 13px; line-height: 1.4; min-height: 1.4em; max-width: 100%; font-weight: 550; word-break: keep-all; overflow-wrap: anywhere; }
+.subcategory-grid a:hover .subcategory-icon, .subcategory-grid a:focus-visible .subcategory-icon { outline: 2px solid currentColor; outline-offset: 2px; }
 .results-toolbar { position: sticky; z-index: 30; top: 64px; padding: 14px 0 8px; background: var(--bg); }
 .filter-row { display: flex; gap: 8px; align-items: center; padding-top: 10px; }
 .content-kind-tabs { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); border-bottom: 1px solid var(--line); margin-bottom: 12px; }

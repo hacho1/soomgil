@@ -21,6 +21,8 @@ class ProductionConfigurationTests {
         assertThatThrownBy(() -> ProductionConfiguration.validate(valid().withProperty("server.address", "0.0.0.0"))).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> ProductionConfiguration.validate(valid().withProperty("soomgil.allowed-origins", "*"))).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> ProductionConfiguration.validate(valid().withProperty("soomgil.admin.username", ""))).isInstanceOf(IllegalStateException.class);
+        for (String username : new String[]{"test1", "test01", "DEMO"})
+            assertThatThrownBy(() -> ProductionConfiguration.validate(valid().withProperty("soomgil.admin.username", username))).isInstanceOf(IllegalStateException.class);
     }
     @Test void productionNaverCallbackMustMatchThePublicOriginAndProxyPort() {
         var configured=valid().withProperty("soomgil.naver.client-id","public-id").withProperty("soomgil.naver.client-secret","test-secret");

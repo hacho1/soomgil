@@ -31,6 +31,11 @@ export async function checkRelease(value, { production = false, fetcher = fetch 
   const health = await read("/api/health");
   add("api-and-database", health.status === 200 && health.body?.ok === true && health.body?.service === "soomgil");
   add("request-correlation", Boolean(health.requestId));
+  if (health.status === 0) {
+    return { origin, production, checkedAt: new Date().toISOString(), automatedChecksPassed: false,
+      launchApproved: false, checks, timings: { health: [{ durationMs: health.durationMs }] },
+      remaining: ["No HTTP response from the health endpoint. Check the server, port and client network before rerunning; other checks were not attempted."] };
+  }
   const auth = await read("/api/auth/config");
   add("email-configured", auth.status === 200 && auth.body?.emailVerificationAvailable === true, "Configuration only; verify delivery manually.");
   add("naver-configured", auth.status === 200 && auth.body?.naverAvailable === true, "Complete real-domain login manually.");

@@ -1,11 +1,17 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '3.5.0'
+	id 'org.springframework.boot' version '3.5.16'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
 
 group = 'com.soomgil'
 version = '0.0.1-SNAPSHOT'
+
+// Keep the 10.1 line while including the security fixes released after Boot 3.5.16.
+ext['tomcat.version'] = '10.1.60'
+ext['jackson-bom.version'] = '2.21.6'
+ext['log4j2.version'] = '2.25.5'
+ext['mariadb.version'] = '3.5.10'
 
 java {
 	toolchain {
@@ -52,4 +58,17 @@ tasks.named('processResources') {
 
 tasks.withType(JavaCompile).configureEach {
 	options.encoding = 'UTF-8'
+}
+
+tasks.register('dependencyInventory') {
+	doLast {
+		def modules = configurations.runtimeClasspath.resolvedConfiguration.resolvedArtifacts.collect {
+			def id = it.moduleVersion.id
+			[name: "${id.group}:${id.name}".toString(), version: id.version]
+		}.unique().sort { a, b -> a.name <=> b.name }
+		def report = layout.buildDirectory.file('reports/dependencies/runtime.json').get().asFile
+		report.parentFile.mkdirs()
+		report.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(modules))
+		println "Runtime dependency inventory: ${modules.size()} modules"
+	}
 }

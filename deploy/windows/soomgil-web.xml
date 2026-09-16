@@ -5,6 +5,7 @@
   <executable>%BASE%\caddy.exe</executable>
   <arguments>run --config "%BASE%\..\Caddyfile" --adapter caddyfile</arguments>
   <env name="SOOMGIL_WEB_ROOT" value="%BASE%\..\..\frontend\dist" />
+  <env name="SOOMGIL_DOMAIN" value="jiri.hknu.ac.kr" />
   <workingdirectory>%BASE%\..\..</workingdirectory>
   <startmode>Automatic</startmode>
   <delayedAutoStart>true</delayedAutoStart>

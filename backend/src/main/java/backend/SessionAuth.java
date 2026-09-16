@@ -4,6 +4,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -19,22 +21,24 @@ public class SessionAuth {
     private final HttpSessionSecurityContextRepository repository;
     private final String adminUsername;
     private final boolean sharing;
+    private final boolean publicDeployment;
 
     public SessionAuth(HttpServletRequest request, HttpServletResponse response,
             HttpSessionSecurityContextRepository repository,
             @Value("${soomgil.admin.username:}") String adminUsername,
-            @Value("${soomgil.sharing.enabled:false}") boolean sharing) {
+            @Value("${soomgil.sharing.enabled:false}") boolean sharing, Environment environment) {
         this.request = request;
         this.response = response;
         this.repository = repository;
         this.adminUsername = adminUsername;
         this.sharing = sharing;
+        this.publicDeployment = sharing || environment.acceptsProfiles(Profiles.of("production"));
     }
 
     public String currentUser() {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         String user=authentication == null || authentication instanceof AnonymousAuthenticationToken ? "" : authentication.getName();
-        return blockedForSharing(user) ? "" : user;
+        return blockedDemoAccount(user) ? "" : user;
     }
 
     public String requireUser() {
@@ -52,15 +56,24 @@ public class SessionAuth {
     }
 
     public boolean isReservedUsername(String username) {
-        return blockedForSharing(username) || (!adminUsername.isBlank() && adminUsername.equalsIgnoreCase(username));
+        return blockedDemoAccount(username) || (!adminUsername.isBlank() && adminUsername.equalsIgnoreCase(username));
     }
 
-    private boolean blockedForSharing(String username) {
-        return sharing && java.util.Set.of("test1","test01","demo").contains(username.toLowerCase(java.util.Locale.ROOT));
+    static boolean demoUsername(String username) {
+        return username != null && java.util.Set.of("test1","test01","demo").contains(username.toLowerCase(java.util.Locale.ROOT));
+    }
+
+    private boolean blockedDemoAccount(String username) {
+        return publicDeployment && demoUsername(username);
+    }
+
+    public void requireAdmin() {
+        requireUser();
+        if (!isAdmin()) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "관리자 계정으로 로그인해주세요.");
     }
 
     public void login(String username, boolean remember) {
-        if (blockedForSharing(username)) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"공유 테스트에서는 새로 가입한 계정으로 로그인해주세요.");
+        if (blockedDemoAccount(username)) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"공개 서비스에서는 개인 계정으로 로그인해주세요.");
         var session = request.getSession(true);
         request.changeSessionId();
         session.setMaxInactiveInterval(remember ? 30 * 24 * 60 * 60 : 12 * 60 * 60);

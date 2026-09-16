@@ -51,6 +51,8 @@ run-frontend.cmd
 
 ## DB와 배포
 
+지리산 전용 Windows 서버로 옮길 때는 [배포 인수인계](docs/JIRI_HANDOFF.md)와 [2026-09-16 검사 결과](docs/DEPLOYMENT_AUDIT_20260916.md)를 먼저 확인합니다. 외장하드는 운반용이며 운영은 서버 내부 디스크에서 실행합니다.
+
 기본 실행 DB는 **MariaDB가 아닌 H2 파일 DB**입니다. MariaDB 환경변수 예시는 `.env.example`에 있으며, 실제 MariaDB 전환과 기존 개인정보 덤프 이관은 별도 검증이 필요합니다. 현재는 공개 장소 자료만 덤프에서 추출했습니다.
 
 배포 전에는 HTTPS, `SOOMGIL_SECURE_COOKIES=true`, 실제 도메인 허용 출처, 관리자 지정, 테스트 계정 제거/비밀번호 변경, 인증 서비스, 호출 제한, DB 마이그레이션 및 백업 복구 훈련을 완료해야 합니다. 공개 서비스 출시 준비가 모두 끝난 상태는 아닙니다.

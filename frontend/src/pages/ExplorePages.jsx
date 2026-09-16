@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowRight, Camera, ChevronLeft, ChevronRight, Coffee, Compass, Landmark, Leaf, MapPin, Moon, Pause, Play, Search, SlidersHorizontal, Sparkles, Sunset, Tent, Trees, Utensils, Waves, X } from "lucide-react";
+import { ArrowRight, Camera, ChevronLeft, ChevronRight, Coffee, Landmark, Leaf, MapPin, Pause, Play, Search, SlidersHorizontal, Sparkles, Tent, Trees, Utensils, Waves, X } from "lucide-react";
 import categories from "../data/categories.json" with { type: "json" };
 import regions from "../data/regions.json" with { type: "json" };
 import { useApp, useResource } from "../lib/context";
@@ -9,9 +9,9 @@ import { useCrowdInfo } from "../lib/useCrowdInfo";
 import { usePlaceSearch } from "../lib/usePlaceSearch";
 import { homeSlides, homeVisiblePlaces } from "../lib/recommendations";
 import { ErrorState, IconButton, Loading, Modal, PageHeading, PlaceCard, PlaceImage, EmptyState } from "../components/ui";
+import SubcategoryIcon from "../components/SubcategoryIcon";
 
 const icons = { tour: Waves, walk: Trees, camping: Tent, food: Utensils, cafe: Coffee, culture: Landmark, nature: Leaf, experience: Sparkles, photo: Camera };
-const topicIcons = { "전망대": MapPin, "야경": Moon, "바다": Waves, "해변": Waves, "해수욕장": Waves, "계곡": Trees, "노을": Sunset, "등대": Landmark };
 export function HomePage() {
   const { catalog, homeFeed, user, catalogLoading, catalogError, reloadCatalog, openSearch, openPlace, recentViews } = useApp();
   const navigate = useNavigate();
@@ -64,7 +64,7 @@ export function CategoryPage() {
   return <div className="page category-page"><PageHeading title="카테고리" action={<IconButton label="검색" onClick={() => openSearch()}><Search size={22} /></IconButton>} />
     <div className="category-layout"><nav className="category-rail" aria-label="여행 대주제">{categories.map(item => { const Icon = icons[item.id]; return <button className={group.id === item.id ? "active" : ""} key={item.id} onClick={() => setGroup(item)} aria-pressed={group.id === item.id}><Icon size={22} /><span>{item.label}</span></button>; })}</nav>
       <section className="category-content"><div className="category-intro"><span className="eyebrow">EXPLORE</span><h2>{group.label}</h2><Link to={`/search?category=${group.id}`}>{group.label} 전체 보기 <ArrowRight size={15} /></Link></div>
-        <div className="subcategory-grid">{group.items.map((item, i) => <Link to={`/search?category=${group.id}&q=${encodeURIComponent(item)}`} key={item}><span className={`subcategory-icon tone-${i % 6}`}>{(() => { const Icon = topicIcons[item] || icons[group.id]; return <Icon size={21} strokeWidth={1.5} />; })()}</span><strong>{item}</strong></Link>)}</div>
+        <div className="subcategory-grid">{group.items.map(item => <Link to={`/search?category=${group.id}&q=${encodeURIComponent(item)}`} key={item}><SubcategoryIcon group={group.id} topic={item} /><strong>{item}</strong></Link>)}</div>
       </section>
     </div>
   </div>;
