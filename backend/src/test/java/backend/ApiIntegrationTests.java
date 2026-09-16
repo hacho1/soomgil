@@ -589,10 +589,17 @@ class ApiIntegrationTests {
         assertThat(json(browser.get("/api/users/" + user + "/progress"))).isEqualTo(first);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE user_id=? AND type='badge'", Long.class, user)).isEqualTo(2);
         String selected = "[\"first-view\",\"hidden-hunter\",\"view-fifteen\"]";
-        assertThat(browser.put("/api/users/" + user + "/settings", Map.of("displayBadgeIdsJson", selected)).statusCode()).isEqualTo(200);
+        String settings = "/api/users/" + user + "/settings";
+        assertThat(browser.put(settings, Map.of("displayBadgeIdsJson", selected)).statusCode()).isEqualTo(400);
+        assertThat(browser.put(settings, Map.of("displayBadgeIdsJson", "[\"first-view\",\"hidden-hunter\"]")).statusCode()).isEqualTo(400);
+        jdbc.update("UPDATE user_settings SET display_badge_ids_json=? WHERE user_id=?", selected, user);
+        assertThat(json(browser.get(settings)).path("displayBadgeIds").toString()).isEqualTo("[\"first-view\"]");
+        assertThat(browser.put(settings, Map.of("displayBadgeIdsJson", "[\"hidden-hunter\"]")).statusCode()).isEqualTo(200);
+        assertThat(json(browser.get(settings)).path("displayBadgeIds").toString()).isEqualTo("[\"hidden-hunter\"]");
         progressService.record(user, "favorite", "one");
         assertThat(browser.put("/api/users/" + user + "/settings", Map.of("displayBadgeIdsJson", "[\"first-view\",\"hidden-hunter\",\"view-fifteen\",\"first-favorite\"]")).statusCode()).isEqualTo(400);
         assertThat(browser.put("/api/users/" + user + "/settings", Map.of("displayBadgeIdsJson", "[]")).statusCode()).isEqualTo(200);
+        assertThat(json(browser.get(settings)).path("displayBadgeIds")).isEmpty();
     }
 
     @Test

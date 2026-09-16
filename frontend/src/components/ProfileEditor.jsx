@@ -6,10 +6,11 @@ import { readImage, cropImage } from "../lib/images";
 import { useApp } from "../lib/context";
 import { Avatar, IconButton, Modal } from "./ui";
 import BadgeArtwork from "./BadgeArtwork";
+import { displayBadgeIds, toggleDisplayBadge } from "../lib/displayBadge";
 
 export default function ProfileEditor({ onClose }) {
   const { user, changed, notify } = useApp();
-  const [form, setForm] = useState({ nickname: user.nickname, profileImage: user.profileImage, profileBorder: user.profileBorder, displayBadgeIds: user.displayBadgeIds });
+  const [form, setForm] = useState({ nickname: user.nickname, profileImage: user.profileImage, profileBorder: user.profileBorder, displayBadgeIds: displayBadgeIds(user.displayBadgeIds) });
   const [source, setSource] = useState("");
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [area, setArea] = useState(null);
@@ -40,10 +41,8 @@ export default function ProfileEditor({ onClose }) {
     <div className="avatar-choices">{["👤", "🌊", "⛰️", "☕", "🌿"].map(emoji => <button type="button" key={emoji} aria-label={`${emoji} 프로필 선택`} aria-pressed={!source && form.profileImage === emoji} onClick={() => { setSource(""); setForm({ ...form, profileImage: emoji }); }}>{emoji}</button>)}</div>
     <label className="field-label">닉네임<input required minLength={2} maxLength={16} value={form.nickname} onChange={event => setForm({ ...form, nickname: event.target.value })} /></label>
     <fieldset><legend>프로필 테두리</legend><div className="swatches">{["#0d9488", "#3679d8", "#a855a3", "#df735f", "#697580"].map(color => <button key={color} type="button" style={{ background: color }} aria-label={`${color} 테두리`} aria-pressed={form.profileBorder === color} onClick={() => setForm({ ...form, profileBorder: color })} />)}</div></fieldset>
-    <fieldset><legend>전시 배지 <span>{form.displayBadgeIds.length}/3</span></legend><div className="badge-select">{earned.map(badge => <button type="button" key={badge.id} aria-pressed={form.displayBadgeIds.includes(badge.id)} onClick={() => {
-      const selected = form.displayBadgeIds.includes(badge.id);
-      if (!selected && form.displayBadgeIds.length >= 3) { setError("배지는 최대 3개까지 전시할 수 있어요."); return; }
-      setError(""); setForm({ ...form, displayBadgeIds: selected ? form.displayBadgeIds.filter(id => id !== badge.id) : [...form.displayBadgeIds, badge.id] });
+    <fieldset><legend>전시 배지 <span>{form.displayBadgeIds.length}/1</span></legend><div className="badge-select">{earned.map(badge => <button type="button" key={badge.id} aria-pressed={form.displayBadgeIds.includes(badge.id)} onClick={() => {
+      setError(""); setForm({ ...form, displayBadgeIds: toggleDisplayBadge(form.displayBadgeIds, badge.id) });
     }}><BadgeArtwork badge={badge} size="small" /><span>{badge.label}</span></button>)}</div>{earned.length === 0 && <p className="muted">아직 획득한 배지가 없어요.</p>}</fieldset>
     {error && <p className="form-error" role="alert">{error}</p>}<button className="primary-button full" disabled={busy || Boolean(source && !area)}>{busy ? "저장 중..." : "저장"}</button>
   </form></Modal>;

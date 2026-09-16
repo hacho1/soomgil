@@ -576,7 +576,7 @@ public class SoomgilApiController {
                 if (column.equals("interests_json")) value = preferences.interestsJson(value);
                 if (column.equals("display_badge_ids_json")) {
                     var ids = readStringList(text(value));
-                    if (ids.size() > 3 || new LinkedHashSet<>(ids).size() != ids.size() || !progress.earnedIds(userId).containsAll(ids)) throw badRequest("획득한 배지만 최대 3개 전시할 수 있습니다.");
+                    if (ids.size() > 1 || !progress.earnedIds(userId).containsAll(ids)) throw badRequest("획득한 배지만 최대 1개 전시할 수 있습니다.");
                 }
                 if (column.startsWith("address_") && !text(value).matches("^[가-힣a-zA-Z\\s]{0,50}$")) throw badRequest("주소에는 시·도, 시·군·구, 읍·면·동 이름만 입력해주세요.");
                 jdbc.update("UPDATE user_settings SET " + column + "=? WHERE user_id=?", value, userId);
@@ -1435,7 +1435,7 @@ public Map<String, Object> updatePlaceSubmission(@PathVariable long id, @Request
         map.put("phone", text(value(row, "phone")));
         map.put("profileImage", textOr(value(row, "profile_image"), "👤"));
         map.put("profileBorder", textOr(value(row, "profile_border"), "#6d5dfc"));
-        map.put("displayBadgeIds", readStringList(text(value(row, "display_badge_ids_json"))));
+        map.put("displayBadgeIds", readStringList(text(value(row, "display_badge_ids_json"))).stream().limit(1).toList());
         map.put("interests", readStringList(text(value(row, "interests_json"))));
         map.putAll(preferences.read(userId));
         map.put("darkMode", bool(value(row, "dark_mode")));

@@ -18,7 +18,7 @@ export function MyPage() {
   const { user, authLoading, favorites, darkMode, setDarkMode } = useApp();
   const [profileOpen, setProfileOpen] = useState(false);
   if (authLoading) return <div className="page"><Loading /></div>;
-  const displayed = user?.progress?.badges?.filter(badge => badge.earned && user.displayBadgeIds.includes(badge.id)) || [];
+  const displayed = user?.displayBadgeIds?.slice(0, 1).map(id => user.progress?.badges?.find(badge => badge.earned && badge.id === id)).filter(Boolean) || [];
   return <div className="page my-page"><PageHeading title="마이페이지" action={<Link to="/settings" className="icon-button" aria-label="설정" state={{ returnTo: "/mypage" }}><Settings size={22} /></Link>} />
     {user ? <section className="profile-section"><div className="profile-main"><Avatar user={user} /><div><span className="profile-level">Lv.{user.progress?.level || 1} {user.progress?.levelName || "새싹 여행자"}</span><h2>{user.nickname}</h2><div className="display-badges">{displayed.map(badge => <Link to="/mypage/badges" key={badge.id} title={badge.label}><BadgeArtwork badge={badge} size="small" /><span>{badge.label}</span></Link>)}</div></div></div>
       <div className="profile-stats"><Link to="/mypage/followers" state={{ returnTo: "/mypage" }}><strong>{user.stats.followers}</strong><span>팔로워</span></Link><Link to="/mypage/following" state={{ returnTo: "/mypage" }}><strong>{user.stats.following}</strong><span>팔로잉</span></Link><Link to="/mypage/favorites" state={{ returnTo: "/mypage" }}><strong>{favorites.length}</strong><span>찜한 장소</span></Link></div>

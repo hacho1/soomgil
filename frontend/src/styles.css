@@ -397,6 +397,7 @@ progress::-webkit-progress-value { background: var(--accent); border-radius: 6px
 .logout-button { display: flex; gap: 10px; align-items: center; padding: 25px 0; color: var(--muted); }
 .account-id { display: flex; justify-content: space-between; min-height: 50px; align-items: center; }
 .form-stack { display: grid; gap: 18px; }
+.profile-dialog .form-stack { grid-template-columns: minmax(0, 1fr); }
 .field-label { display: grid; gap: 7px; font-size: 13px; font-weight: 600; }
 .field-label small { font-weight: 400; line-height: 1.5; }
 .field-hint { font-size: 12px; color: var(--muted); margin-top: -12px; }

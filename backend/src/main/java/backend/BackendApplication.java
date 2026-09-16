@@ -9,6 +9,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class BackendApplication {
 
 	public static void main(String[] args) throws Exception {
+		if (args.length > 0 && "--check-deployment".equals(args[0])) {
+			DeploymentPreflight.main(java.util.Arrays.copyOfRange(args, 1, args.length));
+			return;
+		}
 		if (args.length > 0 && "--verify-backup".equals(args[0])) {
 			BackupArchive.main(java.util.Arrays.copyOfRange(args, 1, args.length));
 			return;

@@ -20,7 +20,7 @@ class DiscoveryBenchmarkTests {
         Object[] args;
         TracedJdbc(DriverManagerDataSource source) { super(source); }
         @Override public List<Map<String,Object>> queryForList(String sql, Object... args) {
-            this.sql=sql; this.args=args;
+            if (sql.contains("COUNT(*) OVER()")) { this.sql=sql; this.args=args; }
             return super.queryForList(sql,args);
         }
     }
@@ -54,10 +54,20 @@ class DiscoveryBenchmarkTests {
                 System.out.println("Real backup uncached candidate query ms="+(System.nanoTime()-start)/1_000_000+", candidates="+rows.size());
                 assertThat(rows.size()).isBetween(1,360);
             }
-            for (String query : List.of("바다","강릉 바다","산책","캠핑","바다 카페")) {
+            for (String query : List.of("바다","카페","강릉 바다","산책","캠핑","바다 카페")) {
                 long start=System.nanoTime(); var page=queries.search(query,"","","recommended",1,6,profile);
                 System.out.println("Real backup search="+query+", ms="+(System.nanoTime()-start)/1_000_000+", total="+page.total()+", names="+page.rows().stream().map(p->p.get("name")).toList());
                 assertThat(jdbc.queryForObject("EXPLAIN "+jdbc.sql,String.class,jdbc.args)).doesNotContain("places_discovery_idx");
+                String previousSql=jdbc.sql.replace("SELECT p.id,COUNT(*) OVER() AS result_total FROM", "SELECT p.* FROM");
+                String previousCount="SELECT COUNT(*) FROM places p WHERE "+previousSql.split(" WHERE ",2)[1].split(" ORDER BY ",2)[0];
+                Object[] previousArgs=jdbc.args;
+                Object[] filters=Arrays.copyOf(previousArgs,(int)previousCount.chars().filter(c->c=='?').count());
+                long previousStart=System.nanoTime();
+                long previousTotal=jdbc.queryForObject(previousCount,Long.class,filters);
+                var previousRows=jdbc.queryForList(previousSql,previousArgs);
+                System.out.println("Previous two-scan search="+query+", ms="+(System.nanoTime()-previousStart)/1_000_000);
+                assertThat(page.total()).isEqualTo(previousTotal);
+                assertThat(page.rows()).isEqualTo(previousRows);
             }
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM places",Long.class)).isEqualTo(count);
         }

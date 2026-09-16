@@ -124,11 +124,26 @@ public class PlaceQueries {
         var args = new ArrayList<Object>();
         String where = where(query, region, category, args);
         if (!kind.isEmpty()) { where += " AND p.content_kind=?"; args.add(kind); }
-        long total = jdbc.queryForObject("SELECT COUNT(*) FROM places p WHERE " + where, Long.class, args.toArray());
-        int current = Math.min(page, Math.max(1, (int) Math.ceil((double) total / size)));
+        Object[] filters = args.toArray();
         String order = "name".equals(sort) ? "p.name_fold,p.id" : DiscoveryRecommendations.searchOrder(query, dictionary.topicIndex(query), profile, CrowdForecast.today(), args);
-        args.add(size); args.add((current - 1) * size);
-        return new Page(jdbc.queryForList("SELECT p.* FROM places p WHERE " + where + " ORDER BY " + order + " LIMIT ? OFFSET ?", args.toArray()), total, current, size);
+        args.add(size); args.add((page - 1) * size);
+        // Count and rank in one scan; load the full place records only for the requested page.
+        String sql = "SELECT p.id,COUNT(*) OVER() AS result_total FROM places p WHERE " + where + " ORDER BY " + order + " LIMIT ? OFFSET ?";
+        var matched = jdbc.queryForList(sql, args.toArray());
+        long total = matched.isEmpty() ? 0 : ((Number) matched.get(0).get("result_total")).longValue();
+        int current = page;
+        if (matched.isEmpty() && page > 1) {
+            total = jdbc.queryForObject("SELECT COUNT(*) FROM places p WHERE " + where, Long.class, filters);
+            current = Math.min(page, Math.max(1, (int) Math.ceil((double) total / size)));
+            if (total > 0) {
+                args.set(args.size() - 1, (current - 1) * size);
+                matched = jdbc.queryForList(sql, args.toArray());
+            }
+        }
+        var ids = matched.stream().map(row -> ((Number) row.get("id")).longValue()).toList();
+        var rows = new java.util.HashMap<Long,Map<String,Object>>();
+        publicRows(ids).forEach(row -> rows.put(((Number) row.get("id")).longValue(), row));
+        return new Page(ids.stream().map(rows::get).filter(java.util.Objects::nonNull).toList(), total, current, size);
     }
     List<Map<String,Object>> discoveryCandidates(DiscoveryRecommendations.Profile profile, java.time.LocalDate day) {
         var args = new ArrayList<Object>();
@@ -151,8 +166,11 @@ public class PlaceQueries {
         return result;
     }
     List<Map<String,Object>> publicDiscoveryRows(List<Long> ids) {
-        if (ids.isEmpty()) return List.of();
         if (ids.size()>360) throw new IllegalArgumentException("Discovery pool is bounded");
+        return publicRows(ids);
+    }
+    private List<Map<String,Object>> publicRows(List<Long> ids) {
+        if (ids.isEmpty()) return List.of();
         return jdbc.queryForList("SELECT * FROM places WHERE approved=TRUE AND tour_visible=TRUE AND id IN (" + String.join(",",java.util.Collections.nCopies(ids.size(),"?")) + ")",ids.toArray());
     }
     public Page nearby(double x, double y, int radius, String category, String sort, int page, int size) {
