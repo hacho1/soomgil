@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 if (-not $ToolsDirectory) { $ToolsDirectory = Join-Path $root 'runtime/deployment-tools' }
-$tools = @(Get-Content -LiteralPath (Join-Path $ToolsDirectory 'tools.json') -Raw | ConvertFrom-Json)
+$tools = Get-Content -LiteralPath (Join-Path $ToolsDirectory 'tools.json') -Raw | ConvertFrom-Json
 foreach ($tool in $tools) {
     if ((Get-FileHash -LiteralPath (Join-Path $ToolsDirectory $tool.file)).Hash -ne $tool.sha256) { throw "Unverified tool: $($tool.name)" }
 }
